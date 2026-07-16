@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Patrick+Hand&family=Gochi+Hand&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#7d6f52;font-family:'Patrick Hand',cursive}
+  a{color:#2B4C9B;text-decoration:none}a:hover{color:#1F1D1B}
+  @keyframes prio{0%,100%{transform:rotate(-2deg) scale(1)}50%{transform:rotate(2deg) scale(1.04)}}
+  @keyframes glowpulse{0%,100%{box-shadow:0 0 2px rgba(244,224,77,.4),0 3px 6px rgba(0,0,0,.35)}50%{box-shadow:0 0 20px rgba(244,224,77,.95),0 3px 6px rgba(0,0,0,.35)}}
+  @keyframes arrowb{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+</style>
+</helmet>
+<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background-color:#b8a67f;background-image:radial-gradient(130% 120% at 50% 25%,rgba(255,255,255,.07),rgba(0,0,0,.22)),repeating-linear-gradient(91deg,rgba(0,0,0,.045) 0 2px,transparent 2px 46px),repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0 1px,transparent 1px 9px)">
+  <div style="width:1600px;height:900px;position:relative;transform:scale({{ boardScale }});transform-origin:center;flex:none;padding:12px 26px;display:flex;flex-direction:column">
+
+    <!-- NAV -->
+    <div style="position:absolute;top:-2px;right:26px;display:flex;gap:6px;z-index:30">
+      <a href="DuelScreen.dc.html" style="font-family:'Permanent Marker';font-size:12px;color:#F5EED8;background:#C23B2E;padding:4px 9px;border-radius:2px;transform:rotate(-2deg);box-shadow:0 2px 3px rgba(0,0,0,.3)">Duel</a>
+      <a href="CardAnatomy.dc.html" style="font-family:'Permanent Marker';font-size:12px;color:#3a2f14;background:#E7D7A9;padding:4px 9px;border-radius:2px;transform:rotate(1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Anatomy</a>
+      <a href="NodeMap.dc.html" style="font-family:'Permanent Marker';font-size:12px;color:#3a2f14;background:#E7D7A9;padding:4px 9px;border-radius:2px;transform:rotate(-1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Map</a>
+      <a href="Shop.dc.html" style="font-family:'Permanent Marker';font-size:12px;color:#3a2f14;background:#E7D7A9;padding:4px 9px;border-radius:2px;transform:rotate(1.5deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Shop</a>
+      <a href="CheatSheet.dc.html" style="font-family:'Permanent Marker';font-size:12px;color:#3a2f14;background:#E7D7A9;padding:4px 9px;border-radius:2px;transform:rotate(-1.5deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Rules</a>
+      <a href="RunSummary.dc.html" style="font-family:'Permanent Marker';font-size:12px;color:#3a2f14;background:#E7D7A9;padding:4px 9px;border-radius:2px;transform:rotate(1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Summary</a>
+    </div>
+
+    <!-- TURN / PHASE STRIP -->
+    <div style="display:flex;align-items:center;gap:14px;height:44px;flex:none">
+      <div style="font-family:'Permanent Marker',cursive;font-size:19px;color:#F5EED8;background:#2B4C9B;padding:5px 14px;border-radius:3px;transform:rotate(-1.4deg);box-shadow:0 2px 4px rgba(0,0,0,.35)">YOUR TURN <span style="font-family:'Patrick Hand';font-size:13px;opacity:.85">· turn 7</span></div>
+      <div style="display:flex;align-items:center;gap:7px;background:rgba(245,238,216,.92);padding:5px 12px;border-radius:4px;transform:rotate(.5deg);box-shadow:0 2px 4px rgba(0,0,0,.25)">
+        <span style="font-family:'Gochi Hand';font-size:13px;color:#8B8578">PHASE:</span>
+        <span style="font-size:15px;color:#a59b83">Draw</span><span style="color:#c3b997">›</span>
+        <span style="font-size:15px;color:#a59b83">Standby</span><span style="color:#c3b997">›</span>
+        <span style="font-family:'Permanent Marker';font-size:16px;color:#C23B2E;background:#F4E04D;padding:1px 8px;border-radius:3px;transform:rotate(-2deg);display:inline-block">MAIN</span>
+        <span style="color:#c3b997">›</span><span style="font-size:15px;color:#a59b83">Battle</span>
+        <span style="color:#c3b997">›</span><span style="font-size:15px;color:#a59b83">Main 2</span>
+        <span style="color:#c3b997">›</span><span style="font-size:15px;color:#a59b83">End</span>
+      </div>
+      <div style="font-family:'Gochi Hand';font-size:13px;color:#5a2a1e;background:#e6a793;padding:4px 10px;border-radius:3px;transform:rotate(-1deg);box-shadow:0 1px 3px rgba(0,0,0,.2)">Normal Summon: <b style="font-family:'Permanent Marker';color:#C23B2E">USED ✗</b></div>
+      <div style="flex:1"></div>
+      <button onClick="{{ openCheat }}" style="font-family:'Permanent Marker',cursive;font-size:15px;color:#3a2f14;background:#F4E04D;border:none;padding:8px 14px;border-radius:2px;transform:rotate(2deg);box-shadow:0 3px 5px rgba(0,0,0,.3);cursor:pointer">CHEAT SHEET</button>
+    </div>
+
+    <!-- OPPONENT HAND -->
+    <div style="height:60px;flex:none;display:flex;justify-content:center;align-items:flex-start;position:relative">
+      <div style="display:flex;align-items:flex-start">
+        <div style="width:46px;height:62px;transform:rotate(-7deg);margin:0 -6px"><dc-import name="Card" face-down="{{ true }}" style="width:46px;height:62px" hint-size="46px,62px"></dc-import></div>
+        <div style="width:46px;height:62px;transform:rotate(-2deg);margin:0 -6px"><dc-import name="Card" face-down="{{ true }}" style="width:46px;height:62px" hint-size="46px,62px"></dc-import></div>
+        <div style="width:46px;height:62px;transform:rotate(3deg);margin:0 -6px"><dc-import name="Card" face-down="{{ true }}" style="width:46px;height:62px" hint-size="46px,62px"></dc-import></div>
+        <div style="width:46px;height:62px;transform:rotate(8deg);margin:0 -6px"><dc-import name="Card" face-down="{{ true }}" style="width:46px;height:62px" hint-size="46px,62px"></dc-import></div>
+      </div>
+      <span style="font-family:'Gochi Hand';font-size:13px;color:#F5EED8;background:#5a4e35;padding:1px 8px;border-radius:10px;margin-left:8px;align-self:center">RILEY'S HAND · 4</span>
+    </div>
+
+    <!-- OPPONENT FIELD -->
+    <div style="flex:none;display:flex;justify-content:center;align-items:center;gap:18px;padding:4px 0">
+      <!-- bank -->
+      <div style="width:212px">
+        <div style="font-family:'Permanent Marker';font-size:11px;color:#C23B2E;transform:rotate(-1deg);margin-bottom:2px">RILEY'S BANK <span style="font-family:'Patrick Hand';color:#7d7150">(public)</span></div>
+        <div style="background:#E7D7A9;border-radius:4px;padding:6px 8px;display:flex;box-shadow:inset 0 0 0 2px rgba(255,255,255,.3),0 2px 3px rgba(0,0,0,.2);transform:rotate(.6deg)">
+          <div style="width:40px;height:56px;margin-right:-8px;transform:rotate(-3deg)"><dc-import name="Card" rank="Q" suit="♠" style="width:40px;height:56px" hint-size="40px,56px"></dc-import></div>
+          <div style="width:40px;height:56px;margin-right:-8px;transform:rotate(0deg)"><dc-import name="Card" rank="Q" suit="♦" style="width:40px;height:56px" hint-size="40px,56px"></dc-import></div>
+          <div style="width:40px;height:56px;margin-right:-8px;transform:rotate(3deg)"><dc-import name="Card" rank="7" suit="♣" style="width:40px;height:56px" hint-size="40px,56px"></dc-import></div>
+          <div style="width:40px;height:56px;transform:rotate(-2deg)"><dc-import name="Card" rank="2" suit="♥" style="width:40px;height:56px" hint-size="40px,56px"></dc-import></div>
+        </div>
+        <div style="font-family:'Gochi Hand';font-size:13px;color:#2B4C9B;margin-top:3px;transform:rotate(.4deg)">🏆 best hand: <b>Pair of Queens</b></div>
+      </div>
+      <!-- grid: spells (top) then monsters (bottom, near center) -->
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;gap:7px">
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#a9b6cc;border-radius:5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);transform:rotate(-1deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#2f4257;opacity:.7">T1</span><div style="width:54px;height:76px;border:2px dashed rgba(47,66,87,.4);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(47,66,87,.5)">empty</div></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#8fa9c9;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.25),inset 0 0 0 2px rgba(255,255,255,.22);transform:rotate(1.2deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#2f4257;opacity:.7">T2 SET</span><dc-import name="Card" face-down="{{ true }}" style="width:54px;height:76px" hint-size="54px,76px"></dc-import></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#8fa9c9;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.25),inset 0 0 0 2px rgba(255,255,255,.22);transform:rotate(-.6deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#2f4257;opacity:.7">T3 SET</span><dc-import name="Card" face-down="{{ true }}" style="width:54px;height:76px" hint-size="54px,76px"></dc-import></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#a9b6cc;border-radius:5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);transform:rotate(.8deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#2f4257;opacity:.7">T4</span><div style="width:54px;height:76px;border:2px dashed rgba(47,66,87,.4);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(47,66,87,.5)">empty</div></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#a9b6cc;border-radius:5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);transform:rotate(-1deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#2f4257;opacity:.7">T5</span><div style="width:54px;height:76px;border:2px dashed rgba(47,66,87,.4);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(47,66,87,.5)">empty</div></div>
+        </div>
+        <div style="display:flex;gap:7px">
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#dc9a85;border-radius:5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);transform:rotate(1deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#5a2a1e;opacity:.7">M1</span><div style="width:54px;height:76px;border:2px dashed rgba(90,42,30,.4);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(90,42,30,.5)">empty</div></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#dc9a85;border-radius:5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);transform:rotate(-1.2deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#5a2a1e;opacity:.7">M2</span><div style="width:54px;height:76px;border:2px dashed rgba(90,42,30,.4);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(90,42,30,.5)">empty</div></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#d68b73;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.25),inset 0 0 0 2px rgba(255,255,255,.22);transform:rotate(.6deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#5a2a1e;opacity:.7">M3 SET</span><dc-import name="Card" face-down="{{ true }}" style="width:54px;height:76px;transform:rotate(90deg)" hint-size="54px,76px"></dc-import></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#d68b73;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.25),inset 0 0 0 2px rgba(255,255,255,.22);transform:rotate(-.8deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#5a2a1e;opacity:.7">M4 🛡</span><dc-import name="Card" rank="6" suit="♣" style="width:54px;height:76px;transform:rotate(90deg)" hint-size="54px,76px"></dc-import><span style="position:absolute;bottom:-7px;right:-7px;font-family:'Permanent Marker';font-size:14px;color:#fff;background:#2f6d4f;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;transform:rotate(-6deg)">6</span></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#dc9a85;border-radius:5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);transform:rotate(1deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#5a2a1e;opacity:.7">M5</span><div style="width:54px;height:76px;border:2px dashed rgba(90,42,30,.4);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(90,42,30,.5)">empty</div></div>
+        </div>
+      </div>
+      <!-- deck + graveyard -->
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;transform:rotate(1deg)">
+          <div style="position:relative;width:58px;height:80px">
+            <div style="position:absolute;top:4px;left:4px;width:54px;height:76px;border-radius:5px;background:#a8452f;border:1.5px solid #2b2b2b"></div>
+            <div style="position:absolute;top:2px;left:2px;width:54px;height:76px;border-radius:5px;background:#b8503f;border:1.5px solid #2b2b2b"></div>
+            <div style="position:absolute;top:0;left:0;width:54px;height:76px"><dc-import name="Card" face-down="{{ true }}" style="width:54px;height:76px" hint-size="54px,76px"></dc-import></div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><span style="font-family:'Permanent Marker';font-size:25px;color:#fff;text-shadow:0 0 3px #000,2px 2px 0 rgba(0,0,0,.5)">14</span></div>
+          </div>
+          <div style="width:64px;height:9px;background:#5a4e35;border-radius:5px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.4)"><div style="width:27%;height:100%;background:#e0a53c"></div></div>
+          <span style="font-family:'Gochi Hand';font-size:10px;color:#4a3f28">DECK 14/52</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;transform:rotate(-2deg)">
+          <button onClick="{{ openGyRiley }}" style="position:relative;width:58px;height:80px;padding:0;border:none;background:none;cursor:pointer">
+            <div style="position:absolute;inset:0;border:2px dashed #6b5f45;border-radius:6px;background:rgba(90,78,53,.15)"></div>
+            <div style="position:absolute;top:3px;left:3px;width:52px;height:74px"><dc-import name="Card" rank="J" suit="♦" style="width:52px;height:74px" hint-size="52px,74px"></dc-import></div>
+            <span style="position:absolute;bottom:-6px;right:-6px;font-family:'Permanent Marker';font-size:11px;color:#fff;background:#5a4e35;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center">12</span>
+          </button>
+          <span style="font-family:'Gochi Hand';font-size:10px;color:#4a3f28">GRAVE ▸ tap</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER: prompt / stack / priority -->
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:20px;min-height:0;padding:2px 0">
+      <!-- PROMPT column: forced-choice note + poly note + margin note -->
+      <div style="width:246px;display:flex;flex-direction:column;gap:12px;align-items:stretch">
+        <div style="font-family:'Patrick Hand';font-size:13px;color:#5a4e35;transform:rotate(-1.5deg);align-self:flex-start;background:rgba(245,238,216,.7);padding:2px 6px;border-radius:3px">(you'd only ever see one of these prompts at a time)</div>
+        <div style="background-color:#F5EED8;background-image:repeating-linear-gradient(#F5EED8 0 22px,#ccd8e0 22px 23px);padding:12px 16px 14px;transform:rotate(-1.5deg);box-shadow:0 4px 8px rgba(0,0,0,.3);position:relative;border-left:2px solid #d98b8b">
+          <div style="position:absolute;top:-11px;left:50%;transform:translateX(-50%) rotate(3deg);width:70px;height:22px;background:rgba(232,222,170,.72);box-shadow:0 1px 2px rgba(0,0,0,.15)"></div>
+          <div style="font-family:'Permanent Marker';font-size:15px;color:#C23B2E;margin-bottom:5px">⚡ FORCED CHOICE</div>
+          <div style="font-size:15px;color:#1F1D1B;line-height:1.15;margin-bottom:10px">Bank a card from your hand <b style="font-family:'Permanent Marker';font-size:13px">OR</b> remove a card from their bank.</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button onClick="{{ bankChoice }}" style="font-family:'Permanent Marker';font-size:12px;color:#2f4257;background:#a9c3e0;border:1.5px solid #2f4257;border-radius:3px;padding:7px;cursor:pointer;transform:rotate(-.5deg)">BANK A CARD</button>
+            <button onClick="{{ wreckChoice }}" style="font-family:'Permanent Marker';font-size:12px;color:#5a2a1e;background:#e6a793;border:1.5px solid #5a2a1e;border-radius:3px;padding:7px;cursor:pointer;transform:rotate(.6deg)">WRECK THEIR BANK</button>
+          </div>
+        </div>
+        <div style="background:#FBFAF4;padding:10px 14px;transform:rotate(1.2deg);box-shadow:0 3px 6px rgba(0,0,0,.28);position:relative;border-left:2px solid #c65fa0;align-self:center">
+          <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%) rotate(-4deg);width:56px;height:20px;background:rgba(232,222,170,.72)"></div>
+          <button onClick="{{ openPoly }}" style="font-family:'Permanent Marker';font-size:13px;color:#fff;background:#c65fa0;border:1.5px solid #8f3f74;border-radius:3px;padding:8px 12px;cursor:pointer">✦ PLAY POLY on 7♥</button>
+        </div>
+      </div>
+
+      <!-- THE STACK -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+        <div style="font-family:'Permanent Marker';font-size:15px;color:#3a2f14;background:#F4E04D;padding:3px 12px;border-radius:2px;transform:rotate(-1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">THE STACK — resolves top ↓ first</div>
+        <div style="position:relative;width:360px;height:158px">
+          <!-- bottom: J♥ opponent rank:destroy (waiting) -->
+          <div style="position:absolute;top:66px;left:30px;z-index:1;display:flex;align-items:center;gap:8px;transform:rotate(-3deg)">
+            <span style="font-family:'Permanent Marker';font-size:13px;color:#5a4e35;background:#efe9d6;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #8a7d5f">2</span>
+            <div style="width:50px;height:70px"><dc-import name="Card" rank="J" suit="♥" style="width:50px;height:70px" hint-size="50px,70px"></dc-import></div>
+            <div style="background:#F5EED8;border:1.5px solid #2B4C9B;border-radius:3px;padding:3px 8px;font-size:13px;color:#1F1D1B;line-height:1.1">J♥ — <b style="color:#C23B2E">rank: DESTROY</b><br><span style="font-size:11px;color:#8B8578">waiting — will be negated unless K♠ is answered · <span style="font-family:'Permanent Marker';font-size:9px;color:#C23B2E">RILEY</span></span></div>
+          </div>
+          <!-- top: K♠ you suit:negate (resolves first) -->
+          <div style="position:absolute;top:6px;left:16px;z-index:2;display:flex;align-items:center;gap:8px;transform:rotate(2deg);animation:glowpulse 1.8s ease-in-out infinite;border-radius:6px">
+            <span style="font-family:'Permanent Marker';font-size:14px;color:#fff;background:#C23B2E;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)">1</span>
+            <div style="width:52px;height:72px"><dc-import name="Card" rank="K" suit="♠" style="width:52px;height:72px" hint-size="52px,72px"></dc-import></div>
+            <div style="background:#F4E04D;border:2px solid #C23B2E;border-radius:4px;padding:4px 8px;text-align:left;line-height:1.1"><div style="font-family:'Permanent Marker';font-size:13px;color:#2B4C9B">K♠ — suit: NEGATE</div><div style="font-size:12px;color:#5a2a1e">resolves first → negates their J♥ below · <span style="font-family:'Permanent Marker';font-size:9px;color:#2B4C9B">YOU</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRIORITY (opponent holds it) -->
+      <div style="width:246px;display:flex;flex-direction:column;align-items:center;gap:6px">
+        <div style="font-family:'Permanent Marker';font-size:30px;color:#C23B2E;animation:arrowb 1.1s ease-in-out infinite">▲</div>
+        <div style="font-family:'Permanent Marker';font-size:19px;color:#F5EED8;background:#C23B2E;border-radius:5px;padding:8px 16px;text-align:center;box-shadow:0 3px 6px rgba(0,0,0,.3)">RILEY'S MOVE<br><span style="font-family:'Patrick Hand';font-size:13px;color:#F5EED8;opacity:.9">their window — respond or pass</span></div>
+        <div style="font-family:'Patrick Hand';font-size:14px;color:#5a4e35;background:rgba(245,238,216,.85);padding:3px 10px;border-radius:10px">⏳ waiting on RILEY…</div>
+        <div style="font-family:'Gochi Hand';font-size:12px;color:#7d7150;margin-top:2px">your window opens next — options:</div>
+        <div style="display:flex;gap:8px">
+          <button onClick="{{ respond }}" style="font-family:'Permanent Marker';font-size:12px;color:#fff;background:#2f6d4f;border:none;border-radius:3px;padding:7px 14px;cursor:pointer;box-shadow:0 2px 3px rgba(0,0,0,.3);transform:rotate(-1deg)">RESPOND</button>
+          <button onClick="{{ pass }}" style="font-family:'Permanent Marker';font-size:12px;color:#3a352a;background:#d8cfb2;border:none;border-radius:3px;padding:7px 14px;cursor:pointer;box-shadow:0 2px 3px rgba(0,0,0,.3);transform:rotate(1deg)">PASS</button>
+        </div>
+        <button onClick="{{ toggleAuto }}" style="font-family:'Patrick Hand';font-size:13px;color:#2B4C9B;background:none;border:none;cursor:pointer;margin-top:2px;display:flex;align-items:center;gap:5px">{{ autoBox }} auto-pass when I can't respond</button>
+        <sc-if value="{{ prioMsg }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:14px;color:#1F1D1B;background:rgba(245,238,216,.92);padding:5px 10px;border-radius:3px;text-align:center;transform:rotate(-.6deg);box-shadow:0 1px 3px rgba(0,0,0,.2)">{{ prioMsg }}</div>
+        </sc-if>
+      </div>
+    </div>
+
+    <!-- PLAYER FIELD -->
+    <div style="flex:none;display:flex;justify-content:center;align-items:center;gap:18px;padding:4px 0">
+      <!-- bank -->
+      <div style="width:212px">
+        <div style="font-family:'Permanent Marker';font-size:11px;color:#2B4C9B;transform:rotate(1deg);margin-bottom:2px">YOUR BANK <span style="font-family:'Patrick Hand';color:#7d7150">(public)</span></div>
+        <div style="background:#E7D7A9;border-radius:4px;padding:6px 8px;display:flex;box-shadow:inset 0 0 0 2px rgba(255,255,255,.3),0 2px 3px rgba(0,0,0,.2);transform:rotate(-.6deg)">
+          <div style="width:34px;height:52px;margin-right:-8px;transform:rotate(-4deg)"><dc-import name="Card" rank="A" suit="♠" style="width:34px;height:52px" hint-size="34px,52px"></dc-import></div>
+          <div style="width:34px;height:52px;margin-right:-8px;transform:rotate(-2deg)"><dc-import name="Card" rank="K" suit="♦" style="width:34px;height:52px" hint-size="34px,52px"></dc-import></div>
+          <div style="width:34px;height:52px;margin-right:-8px;transform:rotate(0deg)"><dc-import name="Card" rank="9" suit="♥" style="width:34px;height:52px" hint-size="34px,52px"></dc-import></div>
+          <div style="width:34px;height:52px;margin-right:-8px;transform:rotate(2deg)"><dc-import name="Card" rank="9" suit="♠" style="width:34px;height:52px" hint-size="34px,52px"></dc-import></div>
+          <div style="width:34px;height:52px;margin-right:-8px;transform:rotate(3deg)"><dc-import name="Card" rank="3" suit="♣" style="width:34px;height:52px" hint-size="34px,52px"></dc-import></div>
+          <div style="width:34px;height:52px;transform:rotate(-2deg)"><dc-import name="Card" rank="6" suit="♦" style="width:34px;height:52px" hint-size="34px,52px"></dc-import></div>
+        </div>
+        <div style="font-family:'Gochi Hand';font-size:13px;color:#2B4C9B;margin-top:3px;transform:rotate(-.4deg)">🏆 best hand: <b>Pair of 9s</b></div>
+      </div>
+      <!-- grid: monsters (top, near center) then spells -->
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;gap:7px">
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#dc9a85;border-radius:5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);transform:rotate(-1deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#5a2a1e;opacity:.7">M1</span><div style="width:54px;height:76px;border:2px dashed rgba(90,42,30,.4);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(90,42,30,.5)">empty</div></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#d68b73;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.25),inset 0 0 0 2px rgba(255,255,255,.22);transform:rotate(1.2deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#5a2a1e;opacity:.7">M2 ⚔</span><dc-import name="Card" rank="7" suit="♥" sticker="RALLY" sticker-color="#F4E04D" style="width:54px;height:76px" hint-size="54px,76px"></dc-import><span style="position:absolute;bottom:-7px;right:-7px;font-family:'Permanent Marker';font-size:14px;color:#fff;background:#C23B2E;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;transform:rotate(-6deg)">7</span></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#d68b73;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.25),inset 0 0 0 2px rgba(255,255,255,.22);transform:rotate(-.6deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#5a2a1e;opacity:.7">M3 ⚔</span><dc-import name="Card" rank="10" suit="♠" style="width:54px;height:76px" hint-size="54px,76px"></dc-import><span style="position:absolute;bottom:-7px;right:-7px;font-family:'Permanent Marker';font-size:13px;color:#fff;background:#C23B2E;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;transform:rotate(4deg)">10</span></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#d68b73;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.25),inset 0 0 0 2px rgba(255,255,255,.22);transform:rotate(.8deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#5a2a1e;opacity:.7">M4 SET</span><dc-import name="Card" face-down="{{ true }}" style="width:54px;height:76px;transform:rotate(90deg)" hint-size="54px,76px"></dc-import></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#dc9a85;border-radius:5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);transform:rotate(-1deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#5a2a1e;opacity:.7">M5</span><div style="width:54px;height:76px;border:2px dashed rgba(90,42,30,.4);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(90,42,30,.5)">empty</div></div>
+        </div>
+        <div style="display:flex;gap:7px">
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#8fa9c9;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.25),inset 0 0 0 2px rgba(255,255,255,.22);transform:rotate(1deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#2f4257;opacity:.7">S1 SET</span><dc-import name="Card" face-down="{{ true }}" style="width:54px;height:76px" hint-size="54px,76px"></dc-import></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#a9b6cc;border-radius:5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);transform:rotate(-1.2deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#2f4257;opacity:.7">S2</span><div style="width:54px;height:76px;border:2px dashed rgba(47,66,87,.4);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(47,66,87,.5)">empty</div></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#a9b6cc;border-radius:5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);transform:rotate(.6deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#2f4257;opacity:.7">S3</span><div style="width:54px;height:76px;border:2px dashed rgba(47,66,87,.4);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(47,66,87,.5)">empty</div></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#a9b6cc;border-radius:5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);transform:rotate(-.8deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#2f4257;opacity:.7">S4</span><div style="width:54px;height:76px;border:2px dashed rgba(47,66,87,.4);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(47,66,87,.5)">empty</div></div>
+          <div style="position:relative;width:90px;height:96px;display:flex;align-items:center;justify-content:center;background:#a9b6cc;border-radius:5px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);transform:rotate(1deg)"><span style="position:absolute;top:2px;left:5px;font-family:'Gochi Hand';font-size:10px;color:#2f4257;opacity:.7">S5</span><div style="width:54px;height:76px;border:2px dashed rgba(47,66,87,.4);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(47,66,87,.5)">empty</div></div>
+        </div>
+      </div>
+      <!-- deck + graveyard -->
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;transform:rotate(-1deg)">
+          <div style="position:relative;width:58px;height:80px">
+            <div style="position:absolute;top:4px;left:4px;width:54px;height:76px;border-radius:5px;background:#a8452f;border:1.5px solid #2b2b2b"></div>
+            <div style="position:absolute;top:2px;left:2px;width:54px;height:76px;border-radius:5px;background:#b8503f;border:1.5px solid #2b2b2b"></div>
+            <div style="position:absolute;top:0;left:0;width:54px;height:76px"><dc-import name="Card" face-down="{{ true }}" style="width:54px;height:76px" hint-size="54px,76px"></dc-import></div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><span style="font-family:'Permanent Marker';font-size:25px;color:#fff;text-shadow:0 0 3px #000,2px 2px 0 rgba(0,0,0,.5)">21</span></div>
+          </div>
+          <div style="width:64px;height:9px;background:#5a4e35;border-radius:5px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.4)"><div style="width:40%;height:100%;background:#7ba36f"></div></div>
+          <span style="font-family:'Gochi Hand';font-size:10px;color:#4a3f28">DECK 21/52</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;transform:rotate(2deg)">
+          <button onClick="{{ openGyYou }}" style="position:relative;width:58px;height:80px;padding:0;border:none;background:none;cursor:pointer">
+            <div style="position:absolute;inset:0;border:2px dashed #6b5f45;border-radius:6px;background:rgba(90,78,53,.15)"></div>
+            <div style="position:absolute;top:3px;left:3px;width:52px;height:74px"><dc-import name="Card" rank="8" suit="♦" style="width:52px;height:74px" hint-size="52px,74px"></dc-import></div>
+            <span style="position:absolute;bottom:-6px;right:-6px;font-family:'Permanent Marker';font-size:11px;color:#fff;background:#5a4e35;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center">9</span>
+          </button>
+          <span style="font-family:'Gochi Hand';font-size:10px;color:#4a3f28">GRAVE ▸ tap</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLAYER HAND -->
+    <div style="flex:none;height:112px;display:flex;justify-content:center;align-items:flex-end;position:relative">
+      <span style="position:absolute;left:26px;bottom:40px;font-family:'Permanent Marker';font-size:13px;color:#F5EED8;background:#2B4C9B;padding:2px 10px;border-radius:10px;transform:rotate(-2deg)">YOUR HAND · 5/6</span>
+      <div style="width:70px;height:98px;transform:rotate(-11deg) translateY(14px);margin:0 -8px"><dc-import name="Card" rank="9" suit="♣" style="width:70px;height:98px" hint-size="70px,98px"></dc-import></div>
+      <div style="width:70px;height:98px;transform:rotate(-5deg) translateY(4px);margin:0 -8px"><dc-import name="Card" rank="4" suit="♦" style="width:70px;height:98px" hint-size="70px,98px"></dc-import></div>
+      <div style="width:70px;height:98px;transform:rotate(0deg);margin:0 -8px;z-index:2"><dc-import name="Card" rank="Q" suit="♥" style="width:70px;height:98px" hint-size="70px,98px"></dc-import></div>
+      <div style="width:70px;height:98px;transform:rotate(5deg) translateY(4px);margin:0 -8px"><dc-import name="Card" rank="2" suit="♠" style="width:70px;height:98px" hint-size="70px,98px"></dc-import></div>
+      <div style="width:70px;height:98px;transform:rotate(11deg) translateY(14px);margin:0 -8px"><dc-import name="Card" rank="A" suit="♦" style="width:70px;height:98px" hint-size="70px,98px"></dc-import></div>
+    </div>
+  </div>
+
+  <!-- ===== OVERLAYS ===== -->
+  <sc-if value="{{ gyShow }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeGy }}" style="position:fixed;inset:0;background:rgba(30,22,10,.6);display:flex;align-items:center;justify-content:center;z-index:40">
+      <div onClick="{{ noop }}" style="background-color:#efe9d6;padding:22px 26px 26px;border-radius:4px;box-shadow:0 12px 30px rgba(0,0,0,.5);transform:rotate(-.6deg);max-width:580px;position:relative">
+        <div style="position:absolute;top:-13px;left:40px;width:110px;height:26px;background:rgba(232,222,170,.75);transform:rotate(-3deg)"></div>
+        <div style="font-family:'Permanent Marker';font-size:22px;color:#5a4e35;margin-bottom:4px">{{ gyTitle }}</div>
+        <div style="font-family:'Patrick Hand';font-size:14px;color:#7d7150;margin-bottom:14px">discard pile — public, either player can target it ✎</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;max-width:540px">
+          <sc-for list="{{ gyCards }}" as="card" hint-placeholder-count="6">
+            <div style="width:60px;height:84px"><dc-import name="Card" rank="{{ card.r }}" suit="{{ card.s }}" style="width:60px;height:84px" hint-size="60px,84px"></dc-import></div>
+          </sc-for>
+        </div>
+        <button onClick="{{ closeGy }}" style="margin-top:16px;font-family:'Permanent Marker';font-size:14px;color:#fff;background:#C23B2E;border:none;border-radius:3px;padding:7px 18px;cursor:pointer;transform:rotate(-1deg)">close ✕</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ polyOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closePoly }}" style="position:fixed;inset:0;background:rgba(30,22,10,.62);display:flex;align-items:center;justify-content:center;z-index:50">
+      <div onClick="{{ noop }}" style="background-color:#FBFAF4;background-image:repeating-linear-gradient(#FBFAF4 0 26px,#cfd9df 26px 27px);width:470px;padding:24px 30px 28px;border-radius:5px;box-shadow:0 16px 40px rgba(0,0,0,.55);transform:rotate(.5deg);border-left:3px solid #c65fa0;position:relative">
+        <div style="position:absolute;top:-14px;right:34px;width:120px;height:28px;background:rgba(232,222,170,.75);transform:rotate(4deg)"></div>
+        <div style="font-family:'Permanent Marker';font-size:25px;color:#c65fa0;margin-bottom:2px">POLYMERIZATION! ✦</div>
+        <div style="font-family:'Patrick Hand';font-size:15px;color:#5a5240;margin-bottom:12px">Fusing your <b>7♥</b> — draw from your own deck toward <b>21</b>. When you draw an Ace you pick 1 or 11. STAND = new power ⌈total÷2⌉; BUST = monster torn up.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;min-height:88px;margin-bottom:10px;align-items:flex-start">
+          <sc-for list="{{ bjCards }}" as="card" hint-placeholder-count="2">
+            <div style="width:58px;height:82px"><dc-import name="Card" rank="{{ card.r }}" suit="{{ card.s }}" style="width:58px;height:82px" hint-size="58px,82px"></dc-import></div>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <span style="font-family:'Patrick Hand';font-size:17px;color:#5a5240">TOTAL:</span>
+          <span style="font-family:'Permanent Marker';font-size:38px;color:{{ bjTotalColor }};line-height:1">{{ bjTotal }}</span>
+          <span style="font-family:'Permanent Marker';font-size:15px;color:#5a2a1e">{{ bjMsg }}</span>
+        </div>
+        <sc-if value="{{ pendingAce }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;background:#F4E04D;border:2px dashed #c65fa0;border-radius:4px;padding:8px 12px;transform:rotate(-.5deg)">
+            <span style="font-family:'Permanent Marker';font-size:15px;color:#8f3f74">ACE! count it as…</span>
+            <button onClick="{{ chooseAce1 }}" style="font-family:'Permanent Marker';font-size:16px;color:#fff;background:#2B4C9B;border:none;border-radius:3px;padding:6px 18px;cursor:pointer">1</button>
+            <button onClick="{{ chooseAce11 }}" style="font-family:'Permanent Marker';font-size:16px;color:#fff;background:#2B4C9B;border:none;border-radius:3px;padding:6px 18px;cursor:pointer">11</button>
+          </div>
+        </sc-if>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button onClick="{{ hit }}" style="font-family:'Permanent Marker';font-size:19px;color:#fff;background:#2f6d4f;border:none;border-radius:4px;padding:11px 26px;cursor:pointer;box-shadow:0 3px 5px rgba(0,0,0,.3);transform:rotate(-1deg)">HIT</button>
+          <button onClick="{{ stand }}" style="font-family:'Permanent Marker';font-size:19px;color:#3a2f14;background:#F4E04D;border:none;border-radius:4px;padding:11px 26px;cursor:pointer;box-shadow:0 3px 5px rgba(0,0,0,.3);transform:rotate(1deg)">STAND</button>
+          <div style="flex:1"></div>
+          <button onClick="{{ resetBj }}" style="font-family:'Patrick Hand';font-size:14px;color:#7d7150;background:none;border:1.5px dashed #b7ad8c;border-radius:3px;padding:6px 12px;cursor:pointer">↺ redraw</button>
+          <button onClick="{{ closePoly }}" style="font-family:'Permanent Marker';font-size:14px;color:#fff;background:#C23B2E;border:none;border-radius:3px;padding:8px 14px;cursor:pointer">close ✕</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ cheatOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeCheat }}" style="position:fixed;inset:0;background:rgba(30,22,10,.55);display:flex;align-items:stretch;justify-content:flex-end;z-index:60">
+      <div onClick="{{ noop }}" style="width:560px;height:100%;overflow-y:auto;background-color:#F5EED8;background-image:repeating-linear-gradient(#F5EED8 0 30px,#cfd9df 30px 31px);padding:30px 40px 40px 56px;box-shadow:-10px 0 30px rgba(0,0,0,.4);border-left:3px solid #d98b8b;position:relative">
+        <div style="position:absolute;top:0;bottom:0;left:42px;width:2px;background:#d98b8b"></div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <div style="font-family:'Permanent Marker';font-size:30px;color:#C23B2E;transform:rotate(-1.5deg)">MY GAME — RULES!!!</div>
+          <button onClick="{{ closeCheat }}" style="font-family:'Permanent Marker';font-size:16px;color:#fff;background:#C23B2E;border:none;border-radius:3px;padding:6px 14px;cursor:pointer;transform:rotate(2deg)">close ✕</button>
+        </div>
+        <div style="font-family:'Patrick Hand';font-size:14px;color:#8B8578;margin-bottom:18px">✎ with rule-mods (scrawled after playtesting)</div>
+        <ol style="font-family:'Patrick Hand';font-size:19px;color:#1F1D1B;line-height:1.55;padding-left:22px;margin:0">
+          <li style="margin-bottom:12px">Deck is <b>52 cards + 2 JOKERS</b>. When somebody runs out of cards the game <span style="font-family:'Permanent Marker';color:#C23B2E">ENDS</span> — best 5-card poker hand in your BANK wins!!</li>
+          <li style="margin-bottom:12px">Number cards = <b>MONSTERS</b>. Power = the number on the card.</li>
+          <li style="margin-bottom:12px">Face cards (J Q K) can be played for <b>rank</b> (a number effect) OR <b>suit</b> (a color effect) — you pick when you play it onto the stack.</li>
+          <li style="margin-bottom:12px">Aces = <b>11 OR 1</b> — you pick when it helps.</li>
+          <li style="margin-bottom:12px"><b>ANY card</b> in your hand can be banked. Your bank's best 5-card poker hand is the win condition — keep it public!</li>
+          <li style="margin-bottom:12px">Play the stack top-down. Whoever has priority may <b>respond or pass</b>.</li>
+          <li style="margin-bottom:12px">POLY = point at <b>ONE</b> of your monsters, then play <b>blackjack</b> with your own deck. STAND = new power ⌈total÷2⌉. BUST = torn up.</li>
+          <li style="margin-bottom:4px;position:relative">Traps go <b>face-down sideways</b>. If you punch the wall when you lose, you get
+            <span style="position:relative;display:inline-block;margin:0 2px"><span style="text-decoration:line-through;text-decoration-color:#C23B2E;text-decoration-thickness:2px;color:#8B8578">a free re-draw</span><span style="position:absolute;left:-6px;top:-3px;right:-6px;bottom:1px;background:#FBFAF4;transform:rotate(-2deg);opacity:.6"></span></span>
+            <span style="font-family:'Permanent Marker';font-size:15px;color:#C23B2E;transform:rotate(-3deg);display:inline-block">↳ NO TAKE-BACKS! (wall-punish deleted)</span>
+          </li>
+        </ol>
+        <div style="margin-top:22px;padding-top:14px;border-top:2px dashed #c3b997">
+          <div style="font-family:'Permanent Marker';font-size:15px;color:#2B4C9B;transform:rotate(-1deg);margin-bottom:8px">✦ RULE-MODS THIS RUN ✦</div>
+          <div style="font-family:'Patrick Hand';font-size:16px;color:#1F1D1B;background:rgba(251,250,244,.7);border:1.5px solid #d8cfb2;border-radius:4px;padding:8px 12px;transform:rotate(.4deg)"><b style="font-family:'Permanent Marker';color:#C23B2E">No Take-Backs</b> — whiteout — <i>wall-punish rule deleted</i></div>
+        </div>
+        <div style="margin-top:18px;font-family:'Permanent Marker';font-size:15px;color:#2B4C9B;transform:rotate(-1deg)">☆ house rule: loser feeds the cat ☆</div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { scale: 1, cheat: false, poly: false, gyOwner: null, prio: '', auto: false, bjCards: [{r:'7',s:'♣'},{r:'5',s:'♦'}], bjDone: false, pendingAce: false };
+  bjPile = [{r:'A',s:'♥'},{r:'4',s:'♠'},{r:'2',s:'♦'},{r:'9',s:'♣'},{r:'6',s:'♠'},{r:'3',s:'♦'}];
+  gyData = {
+    riley: { title: "RILEY'S GRAVEYARD · 12", cards: [{r:'J',s:'♦'},{r:'9',s:'♠'},{r:'3',s:'♥'},{r:'A',s:'♣'},{r:'6',s:'♠'},{r:'10',s:'♥'},{r:'4',s:'♣'},{r:'K',s:'♦'},{r:'2',s:'♠'},{r:'8',s:'♣'},{r:'5',s:'♥'},{r:'Q',s:'♦'}] },
+    you:   { title: "YOUR GRAVEYARD · 9",    cards: [{r:'8',s:'♦'},{r:'3',s:'♣'},{r:'K',s:'♥'},{r:'5',s:'♠'},{r:'J',s:'♣'},{r:'2',s:'♥'},{r:'7',s:'♦'},{r:'Q',s:'♣'},{r:'4',s:'♠'}] }
+  };
+  componentDidMount() { this.fit(); this._r = () => this.fit(); window.addEventListener('resize', this._r); }
+  componentWillUnmount() { window.removeEventListener('resize', this._r); }
+  fit() { this.setState({ scale: Math.min(window.innerWidth / 1600, window.innerHeight / 900) }); }
+  bjValue(cards) {
+    let t = 0;
+    for (const c of cards) {
+      if (c.r === 'A') { t += (c.val || 0); }
+      else if (c.r === 'J' || c.r === 'Q' || c.r === 'K') { t += 10; }
+      else t += Number(c.r);
+    }
+    return t;
+  }
+  hit() {
+    const cards = this.state.bjCards;
+    if (this.state.bjDone || this.state.pendingAce || this.bjValue(cards) > 21) return;
+    const nx = this.bjPile[cards.length - 2];
+    if (!nx) return;
+    if (nx.r === 'A') {
+      this.setState({ bjCards: cards.concat([{ r: 'A', s: nx.s, val: 0 }]), pendingAce: true });
+      return;
+    }
+    const nc = cards.concat([nx]);
+    this.setState({ bjCards: nc, bjDone: this.bjValue(nc) > 21 });
+  }
+  chooseAce(v) {
+    const cards = this.state.bjCards.slice();
+    for (let i = cards.length - 1; i >= 0; i--) {
+      if (cards[i].r === 'A' && !cards[i].val) { cards[i] = Object.assign({}, cards[i], { val: v }); break; }
+    }
+    this.setState({ bjCards: cards, pendingAce: false, bjDone: this.bjValue(cards) > 21 });
+  }
+  stand() { if (this.state.pendingAce) return; this.setState({ bjDone: true }); }
+  resetBj() { this.setState({ bjCards: [{r:'7',s:'♣'},{r:'5',s:'♦'}], bjDone: false, pendingAce: false }); }
+  renderVals() {
+    const total = this.bjValue(this.state.bjCards);
+    const bust = total > 21;
+    const g = this.state.gyOwner ? this.gyData[this.state.gyOwner] : null;
+    const fused = Math.ceil(total / 2);
+    return {
+      boardScale: this.state.scale,
+      noop: (e) => { if (e && e.stopPropagation) e.stopPropagation(); },
+      cheatOpen: this.state.cheat, polyOpen: this.state.poly, gyShow: !!this.state.gyOwner,
+      openCheat: () => this.setState({ cheat: true }), closeCheat: () => this.setState({ cheat: false }),
+      openPoly: () => this.setState({ poly: true }), closePoly: () => this.setState({ poly: false }),
+      openGyRiley: () => this.setState({ gyOwner: 'riley' }), openGyYou: () => this.setState({ gyOwner: 'you' }),
+      closeGy: () => this.setState({ gyOwner: null }),
+      gyTitle: g ? g.title : '', gyCards: g ? g.cards : [],
+      bjCards: this.state.bjCards, bjTotal: total,
+      bjTotalColor: bust ? '#C23B2E' : (total === 21 ? '#2f6d4f' : '#3a2f14'),
+      bjMsg: bust ? 'BUST! monster torn up 💥' : (this.state.bjDone ? ('✓ FUSED → power ' + fused) : ''),
+      hit: () => this.hit(), stand: () => this.stand(), resetBj: () => this.resetBj(),
+      pendingAce: this.state.pendingAce,
+      chooseAce1: () => this.chooseAce(1), chooseAce11: () => this.chooseAce(11),
+      respond: () => this.setState({ prio: 'You RESPOND — pick a card to add to the stack.' }),
+      pass: () => this.setState({ prio: 'You PASS — the stack resolves top-down.' }),
+      toggleAuto: () => this.setState({ auto: !this.state.auto }),
+      autoBox: this.state.auto ? '☑' : '☐',
+      prioMsg: this.state.prio,
+      bankChoice: () => this.setState({ prio: 'You chose to BANK — pick a card from your hand.' }),
+      wreckChoice: () => this.setState({ prio: "You chose to WRECK RILEY'S bank — pick a card to remove." }),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+// @house-rules/engine — headless, pure, dependency-free rules engine (M1).
+//
+// Engine contract (non-negotiable, see M1_IMPLEMENTATION_BRIEF.md):
+//   applyAction(state, action, rng) => { state, events }   // pure
+//   legalActions(state, player) => Action[]
+//   viewFor(state, player) => PlayerView                    // redacted
+//   serialize(state) / deserialize(str)                     // full round-trip
+
+export * from './types.js';
+export { createRng, shuffle, type SeededRNG } from './rng.js';
+export {
+  ALL_RANKS,
+  FACE_RANKS,
+  NUMBER_RANKS,
+  SUITS,
+  createDeck,
+  effectiveEffect,
+  effectiveFlipRank,
+  effectivePower,
+  isMonsterCard,
+  isNumberRank,
+  isSettableSpell,
+  isSpellCard,
+  monsterBasePower,
+  numberValue,
+  polyValue,
+  sacrificeCost,
+  suitWeight,
+} from './cards.js';
+export { setupGame, type SetupOptions } from './setup.js';
+export { applyAction } from './reducer.js';
+export { legalActions, hasAnyActivation } from './legal.js';
+export { viewFor, type PlayerView, type SideView, type MonsterView, type SetSpellView } from './view.js';
+export { serialize, deserialize } from './serialize.js';
+export {
+  bestHand,
+  compareBanks,
+  compareScored,
+  evaluate5,
+  pokerRank,
+  showdown,
+  toHandResult,
+  type ScoredHand,
+} from './poker.js';

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Patrick+Hand&family=Gochi+Hand&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#7d6f52;font-family:'Patrick Hand',cursive}
+  a{color:#2B4C9B;text-decoration:none}a:hover{color:#1F1D1B}
+</style>
+</helmet>
+<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background-color:#b8a67f;background-image:radial-gradient(130% 120% at 50% 25%,rgba(255,255,255,.07),rgba(0,0,0,.22)),repeating-linear-gradient(91deg,rgba(0,0,0,.045) 0 2px,transparent 2px 46px)">
+  <div style="width:1600px;height:900px;position:relative;transform:scale({{ boardScale }});transform-origin:center;flex:none">
+    <!-- NAV -->
+    <div style="position:absolute;top:12px;left:22px;display:flex;gap:6px;z-index:20">
+      <a href="DuelScreen.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(-2deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Duel</a>
+      <a href="CardAnatomy.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#F5EED8;background:#C23B2E;padding:5px 11px;border-radius:2px;transform:rotate(1deg);box-shadow:0 2px 3px rgba(0,0,0,.3)">Anatomy</a>
+      <a href="NodeMap.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(-1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Map</a>
+      <a href="Shop.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(1.5deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Shop</a>
+      <a href="CheatSheet.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(-1.5deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Rules</a>
+      <a href="RunSummary.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Summary</a>
+    </div>
+
+    <!-- SHEET -->
+    <div style="position:absolute;top:64px;left:40px;right:40px;bottom:34px;background-color:#F5EED8;background-image:repeating-linear-gradient(#F5EED8 0 34px,#d3dde3 34px 35px);box-shadow:0 8px 22px rgba(0,0,0,.35);padding:26px 44px 30px 72px;transform:rotate(-.3deg)">
+      <div style="position:absolute;top:0;bottom:0;left:52px;width:2px;background:#d98b8b"></div>
+      <div style="position:absolute;top:-14px;left:44%;width:150px;height:30px;background:rgba(232,222,170,.7);transform:rotate(-2deg);box-shadow:0 1px 3px rgba(0,0,0,.15)"></div>
+      <div style="font-family:'Permanent Marker';font-size:34px;color:#C23B2E;transform:rotate(-1deg)">CARD ANATOMY <span style="font-size:20px;color:#2B4C9B">— every state ✎</span></div>
+      <div style="font-family:'Patrick Hand';font-size:16px;color:#8B8578;margin-bottom:14px">the cards are the one "real" thing in a handmade world — everything else is stuck/drawn/taped onto them.</div>
+
+      <div style="display:flex;gap:34px;align-items:flex-start">
+        <!-- HERO annotated card -->
+        <div style="flex:none;width:360px;position:relative;padding-top:12px">
+          <div style="margin:14px auto 0;width:150px;height:210px;position:relative"><dc-import name="Card" rank="7" suit="♥" sticker="RALLY" sticker-color="#F4E04D" conversion="→SPELL" style="width:150px;height:210px" hint-size="150px,210px"></dc-import>
+            <span style="position:absolute;bottom:-12px;right:-12px;font-family:'Permanent Marker';font-size:20px;color:#fff;background:#C23B2E;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid #fff;transform:rotate(-6deg)">7</span>
+          </div>
+          <div style="font-family:'Patrick Hand';font-size:15px;color:#2B4C9B;line-height:1.5;margin-top:26px">
+            <div style="transform:rotate(-.6deg)">↑ <b>rank + suit</b> — a real playing card (7♥)</div>
+            <div style="transform:rotate(.5deg)">↑ <b>sticker</b> — slapped-on modified effect, skewed w/ peel edge</div>
+            <div style="transform:rotate(-.4deg)">↑ <b style="color:#2f6d4f">conversion mark</b> — hand-drawn, card changed type</div>
+            <div style="transform:rotate(.6deg)">↑ <b style="color:#C23B2E">power</b> — scribbled on face-up monsters</div>
+          </div>
+        </div>
+
+        <!-- STATES GRID -->
+        <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:18px 14px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="height:118px;display:flex;align-items:center;justify-content:center"><div style="width:80px;height:112px"><dc-import name="Card" rank="10" suit="♠" style="width:80px;height:112px" hint-size="80px,112px"></dc-import></div></div>
+            <span style="font-family:'Permanent Marker';font-size:13px;color:#1F1D1B">face-up ATTACK</span>
+            <span style="font-family:'Patrick Hand';font-size:12px;color:#8B8578">upright, power shows</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="height:118px;display:flex;align-items:center;justify-content:center"><div style="width:80px;height:112px"><dc-import name="Card" face-down="{{ true }}" style="width:80px;height:112px;transform:rotate(90deg)" hint-size="80px,112px"></dc-import></div></div>
+            <span style="font-family:'Permanent Marker';font-size:13px;color:#1F1D1B">face-down SET</span>
+            <span style="font-family:'Patrick Hand';font-size:12px;color:#8B8578">back, rotated 90°</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="height:118px;display:flex;align-items:center;justify-content:center"><div style="width:80px;height:112px"><dc-import name="Card" rank="6" suit="♣" style="width:80px;height:112px;transform:rotate(90deg)" hint-size="80px,112px"></dc-import></div></div>
+            <span style="font-family:'Permanent Marker';font-size:13px;color:#1F1D1B">face-up DEFENSE</span>
+            <span style="font-family:'Patrick Hand';font-size:12px;color:#8B8578">face shows, rotated 90°</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="height:118px;display:flex;align-items:center;justify-content:center"><div style="width:80px;height:112px"><dc-import name="Card" rank="Q" suit="♦" sticker="SIEGE ENGINE" style="width:80px;height:112px" hint-size="80px,112px"></dc-import></div></div>
+            <span style="font-family:'Permanent Marker';font-size:13px;color:#1F1D1B">STICKERED</span>
+            <span style="font-family:'Patrick Hand';font-size:12px;color:#8B8578">modified effect name</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="height:118px;display:flex;align-items:center;justify-content:center"><div style="width:80px;height:112px"><dc-import name="Card" rank="4" suit="♠" conversion="→SPELL" style="width:80px;height:112px" hint-size="80px,112px"></dc-import></div></div>
+            <span style="font-family:'Permanent Marker';font-size:13px;color:#1F1D1B">TYPE-CONVERTED</span>
+            <span style="font-family:'Patrick Hand';font-size:12px;color:#8B8578">monster → spell (drawn)</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="height:118px;display:flex;align-items:center;justify-content:center;position:relative">
+              <div style="width:80px;height:112px;position:relative;filter:grayscale(.5);opacity:.85"><dc-import name="Card" rank="9" suit="♦" style="width:80px;height:112px" hint-size="80px,112px"></dc-import>
+                <div style="position:absolute;inset:0;border:2px dashed #8B8578;border-radius:6px;background-image:repeating-linear-gradient(45deg,rgba(139,133,120,.16) 0 4px,transparent 4px 9px)"></div>
+                <span style="position:absolute;top:-10px;right:-10px;font-family:'Permanent Marker';font-size:10px;color:#8B8578;background:#FBFAF4;border:1.5px dashed #8B8578;border-radius:8px;padding:1px 5px;transform:rotate(6deg)">v2 idea</span>
+              </div>
+            </div>
+            <span style="font-family:'Permanent Marker';font-size:13px;color:#8B8578">SLEEVED <span style="font-size:10px">(sketch)</span></span>
+            <span style="font-family:'Patrick Hand';font-size:12px;color:#8B8578">post-v1 — pencil only</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="height:118px;display:flex;align-items:center;justify-content:center"><div style="background:#E7D7A9;border-radius:5px;padding:7px 8px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.3),0 2px 4px rgba(0,0,0,.2);transform:rotate(-2deg)"><div style="width:66px;height:92px"><dc-import name="Card" rank="9" suit="♥" style="width:66px;height:92px" hint-size="66px,92px"></dc-import></div></div></div>
+            <span style="font-family:'Permanent Marker';font-size:13px;color:#1F1D1B">BANKED</span>
+            <span style="font-family:'Patrick Hand';font-size:12px;color:#8B8578">public, in manila bank</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="height:118px;display:flex;align-items:center;justify-content:center;position:relative;width:110px">
+              <div style="position:absolute;left:30px;top:22px;width:64px;height:90px;transform:rotate(-4deg)"><dc-import name="Card" rank="J" suit="♥" style="width:64px;height:90px" hint-size="64px,90px"></dc-import></div>
+              <div style="position:absolute;left:16px;top:6px;width:66px;height:92px;transform:rotate(3deg)"><dc-import name="Card" rank="K" suit="♠" style="width:66px;height:92px" hint-size="66px,92px"></dc-import><span style="position:absolute;top:-8px;left:-8px;font-family:'Permanent Marker';font-size:11px;color:#fff;background:#C23B2E;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff">1</span></div>
+            </div>
+            <span style="font-family:'Permanent Marker';font-size:13px;color:#1F1D1B">ON THE STACK</span>
+            <span style="font-family:'Patrick Hand';font-size:12px;color:#8B8578">overlapping, top resolves</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="height:118px;display:flex;align-items:center;justify-content:center"><div style="position:relative;width:76px;height:106px"><div style="position:absolute;inset:0;border:2px dashed #6b5f45;border-radius:7px;background:rgba(90,78,53,.15)"></div><div style="position:absolute;top:4px;left:4px;width:68px;height:96px"><dc-import name="Card" rank="8" suit="♦" style="width:68px;height:96px" hint-size="68px,96px"></dc-import></div><span style="position:absolute;bottom:-7px;right:-7px;font-family:'Permanent Marker';font-size:11px;color:#fff;background:#5a4e35;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center">9</span></div></div>
+            <span style="font-family:'Permanent Marker';font-size:13px;color:#1F1D1B">IN GRAVEYARD</span>
+            <span style="font-family:'Patrick Hand';font-size:12px;color:#8B8578">public, top card visible</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="height:118px;display:flex;align-items:center;justify-content:center"><div style="width:80px;height:112px"><dc-import name="Card" face-down="{{ true }}" style="width:80px;height:112px" hint-size="80px,112px"></dc-import></div></div>
+            <span style="font-family:'Permanent Marker';font-size:13px;color:#1F1D1B">face-down SET SPELL</span>
+            <span style="font-family:'Patrick Hand';font-size:12px;color:#8B8578">spell/trap — upright, NOT rotated</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="height:118px;display:flex;align-items:center;justify-content:center;position:relative"><div style="width:80px;height:112px;position:relative"><dc-import name="Card" rank="8" suit="♣" style="width:80px;height:112px" hint-size="80px,112px"></dc-import><span style="position:absolute;bottom:-8px;right:-8px;font-family:'Permanent Marker';font-size:15px;color:#fff;background:#C23B2E;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;transform:rotate(-6deg)">8</span><span style="position:absolute;bottom:16px;right:-28px;font-family:'Permanent Marker';font-size:18px;color:#2f6d4f;transform:rotate(-10deg)">+3</span></div></div>
+            <span style="font-family:'Permanent Marker';font-size:13px;color:#1F1D1B">BUFFED</span>
+            <span style="font-family:'Patrick Hand';font-size:12px;color:#8B8578">temp buff, marker annotation</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { scale: 1 };
+  componentDidMount() { this.fit(); this._r = () => this.fit(); window.addEventListener('resize', this._r); }
+  componentWillUnmount() { window.removeEventListener('resize', this._r); }
+  fit() { this.setState({ scale: Math.min(window.innerWidth / 1600, window.innerHeight / 900) }); }
+  renderVals() { return { boardScale: this.state.scale }; }
+}
+</script>
+</body>
+</html>

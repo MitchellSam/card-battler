@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Patrick+Hand&family=Gochi+Hand&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#7d6f52;font-family:'Patrick Hand',cursive}
+  a{color:#2B4C9B;text-decoration:none}a:hover{color:#1F1D1B}
+</style>
+</helmet>
+<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background-color:#b8a67f;background-image:radial-gradient(130% 120% at 50% 25%,rgba(255,255,255,.07),rgba(0,0,0,.22)),repeating-linear-gradient(91deg,rgba(0,0,0,.045) 0 2px,transparent 2px 46px)">
+  <div style="width:1600px;height:900px;position:relative;transform:scale({{ boardScale }});transform-origin:center;flex:none">
+    <!-- NAV -->
+    <div style="position:absolute;top:12px;left:22px;display:flex;gap:6px;z-index:20">
+      <a href="DuelScreen.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(-2deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Duel</a>
+      <a href="CardAnatomy.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Anatomy</a>
+      <a href="NodeMap.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(-1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Map</a>
+      <a href="Shop.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(1.5deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Shop</a>
+      <a href="CheatSheet.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#F5EED8;background:#C23B2E;padding:5px 11px;border-radius:2px;transform:rotate(-1.5deg);box-shadow:0 2px 3px rgba(0,0,0,.3)">Rules</a>
+      <a href="RunSummary.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Summary</a>
+    </div>
+
+    <!-- THE SHEET -->
+    <div style="position:absolute;top:58px;left:118px;right:118px;bottom:30px;background-color:#F5EED8;background-image:repeating-linear-gradient(#F5EED8 0 33px,#d3dde3 33px 34px);box-shadow:0 10px 26px rgba(0,0,0,.4);transform:rotate(-.5deg);overflow:hidden">
+      <!-- margin line + holes -->
+      <div style="position:absolute;top:0;bottom:0;left:88px;width:2px;background:#d98b8b"></div>
+      <div style="position:absolute;left:34px;top:80px;width:16px;height:16px;border-radius:50%;background:#b8a67f;box-shadow:inset 0 1px 2px rgba(0,0,0,.4)"></div>
+      <div style="position:absolute;left:34px;top:50%;width:16px;height:16px;border-radius:50%;background:#b8a67f;box-shadow:inset 0 1px 2px rgba(0,0,0,.4)"></div>
+      <div style="position:absolute;left:34px;bottom:80px;width:16px;height:16px;border-radius:50%;background:#b8a67f;box-shadow:inset 0 1px 2px rgba(0,0,0,.4)"></div>
+      <!-- tape corners -->
+      <div style="position:absolute;top:-12px;left:120px;width:150px;height:30px;background:rgba(232,222,170,.68);transform:rotate(-3deg);box-shadow:0 1px 3px rgba(0,0,0,.12)"></div>
+      <div style="position:absolute;top:-12px;right:80px;width:130px;height:30px;background:rgba(232,222,170,.68);transform:rotate(3deg);box-shadow:0 1px 3px rgba(0,0,0,.12)"></div>
+      <!-- juice stain -->
+      <div style="position:absolute;bottom:60px;right:140px;width:110px;height:100px;border-radius:50%;background:radial-gradient(circle,rgba(194,59,46,.14),rgba(194,59,46,.05) 60%,transparent 72%)"></div>
+
+      <div style="position:absolute;top:22px;left:118px;right:40px;bottom:22px;display:flex;gap:44px">
+        <!-- LEFT COLUMN -->
+        <div style="flex:1">
+          <div style="font-family:'Permanent Marker';font-size:36px;color:#C23B2E;transform:rotate(-1.2deg)">MY GAME — RULES!!!</div>
+          <div style="font-family:'Patrick Hand';font-size:15px;color:#8B8578;margin-bottom:12px">(the official house rulebook. do NOT lose this.)</div>
+          <ol style="font-family:'Patrick Hand';font-size:20px;color:#1F1D1B;line-height:1.5;padding-left:24px;margin:0">
+            <li style="margin-bottom:10px">Deck is <b>52 cards + 2 JOKERS</b>. Run out of cards → the game <span style="font-family:'Permanent Marker';color:#C23B2E">ENDS</span> (not a loss). Best 5-card poker hand in your <b>BANK</b> wins!!</li>
+            <li style="margin-bottom:10px">Number cards (A, 2–10) = <b>MONSTERS</b>. Power = the number. Ace = <b>1 or 11</b>, you pick.</li>
+            <li style="margin-bottom:10px"><b>1 normal summon</b> per turn. Monsters <b>5–7 cost 1 sacrifice</b>, <b>8–10 cost 2</b>. Summon face-up attack OR set face-down.</li>
+            <li style="margin-bottom:10px"><b>SET MONSTERS go sideways</b> (rotated 90°). Set spells/traps stay <b>upright</b> (face-down). Face-up defense = face shows, sideways.</li>
+            <li style="margin-bottom:10px">Face cards (J Q K) = <b>SPELLS</b>: play for the <b>RANK</b> effect OR the <b>SUIT</b> effect — never both, chosen on the stack.</li>
+            <li style="margin-bottom:10px"><b>ANY card</b> in hand can be <b>BANKED</b>. Banks are public &amp; <b>unlimited</b>.</li>
+          </ol>
+        </div>
+        <!-- RIGHT COLUMN -->
+        <div style="flex:1;padding-top:64px">
+          <ol start="7" style="font-family:'Patrick Hand';font-size:20px;color:#1F1D1B;line-height:1.4;padding-left:24px;margin:0">
+            <li style="margin-bottom:9px">Stack resolves <b>TOP-DOWN</b> (last played resolves first). Priority → respond or pass.</li>
+            <li style="margin-bottom:9px"><b>Combat:</b> bigger power wins (ties ♠&gt;♥&gt;♣&gt;♦). Win attacker-vs-attacker or hit an empty board → <b>bank a card from hand OR yank one from their bank</b>.</li>
+            <li style="margin-bottom:9px"><b>POLY</b> (♦) = point at <b>ONE</b> monster, blackjack w/ your own deck. STAND = power ⌈total÷2⌉. BUST = torn up.</li>
+            <li style="margin-bottom:9px"><b>Hand limit 6</b> — discard down at end of turn. Draw 1 each turn (Jokers draw 2).</li>
+            <li style="margin-bottom:9px"><b>FLIP EFFECTS:</b> a set monster flipped face-up (or attacked) triggers its number's flip effect.</li>
+            <li style="margin-bottom:4px;position:relative">Punch the wall when you lose = get
+              <span style="position:relative;display:inline-block;margin:0 3px"><span style="text-decoration:line-through;text-decoration-color:#C23B2E;text-decoration-thickness:3px;color:#8B8578">a free re-draw</span><span style="position:absolute;left:-6px;top:-2px;right:-6px;bottom:0;background:#FBFAF4;transform:rotate(-2deg);opacity:.72;border-radius:2px"></span></span>
+              <span style="font-family:'Permanent Marker';font-size:16px;color:#C23B2E;transform:rotate(-3deg);display:inline-block">↳ NO TAKE-BACKS!!</span>
+            </li>
+          </ol>
+
+          <!-- RULE-MODS box -->
+          <div style="margin-top:22px;border:2.5px dashed #8f3f74;border-radius:6px;padding:12px 14px;background:rgba(200,169,214,.12);transform:rotate(.6deg)">
+            <div style="font-family:'Permanent Marker';font-size:17px;color:#8f3f74;margin-bottom:8px">✦ RULE-MODS THIS RUN ✦</div>
+            <div style="display:flex;align-items:center;gap:10px;font-family:'Patrick Hand';font-size:16px;color:#1F1D1B">
+              <span style="font-family:'Permanent Marker';font-size:13px;color:#8B8578;background:#FBFAF4;border:1.5px solid #c3b997;border-radius:3px;padding:2px 6px">WHITEOUT</span>
+              <span><b style="font-family:'Permanent Marker';color:#C23B2E">No Take-Backs</b> — wall-punish rule deleted <span style="font-family:'Permanent Marker';font-size:13px;color:#2f6d4f">(NEW! —Sam)</span></span>
+            </div>
+          </div>
+
+          <div style="margin-top:20px;font-family:'Permanent Marker';font-size:16px;color:#2B4C9B;transform:rotate(-1deg)">☆ loser feeds the cat ☆</div>
+          <!-- margin doodle -->
+          <div style="margin-top:14px;font-family:'Permanent Marker';font-size:40px;color:#c98a3a;opacity:.5;transform:rotate(-8deg)">★ ✎ ♠♥</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { scale: 1 };
+  componentDidMount() { this.fit(); this._r = () => this.fit(); window.addEventListener('resize', this._r); }
+  componentWillUnmount() { window.removeEventListener('resize', this._r); }
+  fit() { this.setState({ scale: Math.min(window.innerWidth / 1600, window.innerHeight / 900) }); }
+  renderVals() { return { boardScale: this.state.scale }; }
+}
+</script>
+</body>
+</html>

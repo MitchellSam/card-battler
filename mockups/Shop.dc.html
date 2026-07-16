@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Patrick+Hand&family=Gochi+Hand&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#7d6f52;font-family:'Patrick Hand',cursive}
+  a{color:#2B4C9B;text-decoration:none}a:hover{color:#1F1D1B}
+  @keyframes stickpop{0%{opacity:0;transform:translateY(14px)}60%{opacity:1}100%{opacity:1;transform:translateY(0)}}
+  @keyframes shimmer{0%,100%{box-shadow:0 3px 6px rgba(0,0,0,.3),0 0 6px rgba(200,169,214,.5)}50%{box-shadow:0 3px 6px rgba(0,0,0,.3),0 0 20px rgba(200,169,214,.95)}}
+  @keyframes wob{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2deg)}}
+</style>
+</helmet>
+<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background-color:#b8a67f;background-image:radial-gradient(130% 120% at 50% 25%,rgba(255,255,255,.07),rgba(0,0,0,.22)),repeating-linear-gradient(91deg,rgba(0,0,0,.045) 0 2px,transparent 2px 46px)">
+  <div style="width:1600px;height:900px;position:relative;transform:scale({{ boardScale }});transform-origin:center;flex:none">
+    <!-- NAV -->
+    <div style="position:absolute;top:12px;left:22px;display:flex;gap:6px;z-index:20">
+      <a href="DuelScreen.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(-2deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Duel</a>
+      <a href="CardAnatomy.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Anatomy</a>
+      <a href="NodeMap.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(-1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Map</a>
+      <a href="Shop.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#F5EED8;background:#C23B2E;padding:5px 11px;border-radius:2px;transform:rotate(1.5deg);box-shadow:0 2px 3px rgba(0,0,0,.3)">Shop</a>
+      <a href="CheatSheet.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(-1.5deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Rules</a>
+      <a href="RunSummary.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 11px;border-radius:2px;transform:rotate(1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Summary</a>
+    </div>
+
+    <div style="position:absolute;top:58px;left:40px;right:40px;display:flex;align-items:baseline;gap:16px">
+      <div style="font-family:'Permanent Marker';font-size:32px;color:#C23B2E;transform:rotate(-1deg)">THE CORNER STORE</div>
+      <div style="font-family:'Patrick Hand';font-size:17px;color:#5a4e35">+ Trade Binder</div>
+      <div style="flex:1"></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;transform:rotate(1.5deg)">
+        <div style="font-family:'Permanent Marker';font-size:20px;color:#8f6a1f;background:#F4E04D;padding:5px 14px;border-radius:20px;box-shadow:0 2px 4px rgba(0,0,0,.25)">🪙 24</div>
+        <span style="font-family:'Patrick Hand';font-size:11px;color:#8B8578;margin-top:2px">coins (name TBD)</span>
+      </div>
+    </div>
+
+    <div style="position:absolute;top:112px;left:40px;right:40px;bottom:34px;display:flex;gap:22px">
+
+      <!-- CORNER STORE SHELF -->
+      <div style="width:340px;flex:none;background-color:#F5EED8;background-image:repeating-linear-gradient(#F5EED8 0 30px,#d3dde3 30px 31px);box-shadow:0 6px 16px rgba(0,0,0,.3);padding:18px 20px;transform:rotate(-.4deg)">
+        <div style="font-family:'Permanent Marker';font-size:19px;color:#2f6d4f;margin-bottom:4px">🏪 SINGLES SHELF</div>
+        <div style="font-family:'Patrick Hand';font-size:13px;color:#8B8578;margin-bottom:14px">upgrades for coins — one each per visit</div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:10px;background:#FBFAF4;border:1.5px solid #d8cfb2;border-radius:4px;padding:8px 10px;transform:rotate(-.5deg)">
+            <div style="width:40px;height:40px;border-radius:6px;background:#e6a793;display:flex;align-items:center;justify-content:center;font-size:20px;transform:rotate(6deg)">✂️</div>
+            <div style="flex:1"><div style="font-family:'Permanent Marker';font-size:14px;color:#1F1D1B">Trim a Card</div><div style="font-size:12px;color:#8B8578">remove 1 card from deck</div></div>
+            <button onClick="{{ buy }}" style="font-family:'Permanent Marker';font-size:12px;color:#8f6a1f;background:#F4E04D;border:none;border-radius:12px;padding:5px 10px;cursor:pointer">🪙 10</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;border:2px dashed #c3b997;border-radius:4px;padding:8px 10px;transform:rotate(.5deg);opacity:.75">
+            <div style="width:40px;height:40px;border-radius:6px;border:2px dashed #b7ad8c;display:flex;align-items:center;justify-content:center;font-family:'Permanent Marker';font-size:16px;color:#8B8578;transform:rotate(-4deg)">?</div>
+            <div style="flex:1"><div style="font-family:'Permanent Marker';font-size:14px;color:#8B8578">more singles</div><div style="font-size:12px;color:#8B8578">TBD — utility only</div></div>
+          </div>
+          <div style="font-family:'Patrick Hand';font-size:12px;color:#8B8578;transform:rotate(-.5deg);padding-left:2px">↑ singles shelf is utility-only. stickers come from packs →</div>
+        </div>
+        <sc-if value="{{ msg }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:14px;font-family:'Patrick Hand';font-size:14px;color:#2f6d4f;background:rgba(123,163,111,.18);border-radius:4px;padding:6px 10px;transform:rotate(-.5deg)">{{ msg }}</div>
+        </sc-if>
+      </div>
+
+      <!-- PACK OPENER (the star) -->
+      <div style="flex:1;background-color:#c9b79a;background-image:radial-gradient(120% 120% at 50% 30%,rgba(255,255,255,.12),rgba(0,0,0,.12));border-radius:6px;box-shadow:inset 0 0 0 3px rgba(255,255,255,.2),0 6px 16px rgba(0,0,0,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;padding:20px">
+        <div style="position:absolute;top:14px;left:50%;transform:translateX(-50%) rotate(-1deg);font-family:'Permanent Marker';font-size:20px;color:#5a4e35">✦ OPEN A PACK ✦</div>
+
+        <sc-if value="{{ sealed }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:20px">
+            <div style="position:relative;width:230px;height:310px;border-radius:8px;background-color:{{ packColor }};background-image:repeating-linear-gradient(28deg,rgba(255,255,255,.14) 0 12px,transparent 12px 26px);border:3px solid #1F1D1B;box-shadow:0 8px 18px rgba(0,0,0,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;animation:wob 3.4s ease-in-out infinite">
+              <div style="position:absolute;top:0;left:0;right:0;height:26px;background:rgba(0,0,0,.12);border-bottom:2px dashed rgba(255,255,255,.55)"></div>
+              <div style="position:absolute;top:-1px;right:-1px;width:52px;height:52px;background:linear-gradient(135deg,transparent 48%,#F5EED8 48%);border-top-right-radius:8px"></div>
+              <span style="position:absolute;top:34px;right:6px;font-family:'Patrick Hand';font-size:11px;color:#5a4e35;transform:rotate(-8deg)">peel ↗</span>
+              <div style="font-family:'Permanent Marker';font-size:24px;color:#1F1D1B;text-align:center;padding:0 16px;line-height:1.1;text-shadow:1px 1px 0 rgba(255,255,255,.4)">{{ packName }}</div>
+              <div style="font-family:'Patrick Hand';font-size:14px;color:#3a352a;margin-top:6px">5 stickers inside</div>
+              <div style="margin-top:16px;width:120px;height:120px;border:3px dashed rgba(31,29,27,.4);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:44px">✦</div>
+            </div>
+            <button onClick="{{ rip }}" style="font-family:'Permanent Marker';font-size:22px;color:#fff;background:#C23B2E;border:none;border-radius:5px;padding:14px 40px;cursor:pointer;box-shadow:0 4px 7px rgba(0,0,0,.35);transform:rotate(-1.5deg)">RIP IT OPEN! ✂</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ opened }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px">
+            <div style="font-family:'Permanent Marker';font-size:22px;color:#8f3f74;transform:rotate(-1deg)">✦ {{ packName }} — sticker sheet! ✦</div>
+            <div style="position:relative;background:#FBFAF4;border-radius:6px;padding:20px;box-shadow:0 6px 16px rgba(0,0,0,.35);background-image:repeating-linear-gradient(0deg,rgba(0,0,0,.02) 0 1px,transparent 1px 8px);transform:rotate(.4deg)">
+              <div style="position:absolute;top:-11px;left:30px;width:90px;height:22px;background:rgba(232,222,170,.72);transform:rotate(-3deg)"></div>
+              <div style="display:flex;gap:16px">
+                <div style="width:118px;height:150px;border:2px dashed #c3b997;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;animation:stickpop .5s ease-out both;animation-delay:.05s"><div style="background:#F4E04D;color:#241f16;font-family:'Permanent Marker';font-size:15px;padding:8px 12px;border-radius:4px;box-shadow:1px 3px 4px rgba(0,0,0,.3);transform:rotate(-6deg);text-align:center">RALLY</div><div style="font-family:'Patrick Hand';font-size:11px;color:#5a4e35;text-align:center;padding:0 8px">+1 to your OTHER attack monsters</div></div>
+                <div style="width:118px;height:150px;border:2px dashed #c3b997;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;animation:stickpop .5s ease-out both;animation-delay:.18s"><div style="background:#8fa9c9;color:#1c2a3a;font-family:'Permanent Marker';font-size:15px;padding:8px 12px;border-radius:4px;box-shadow:1px 3px 4px rgba(0,0,0,.3);transform:rotate(5deg);text-align:center">PEEK</div><div style="font-family:'Patrick Hand';font-size:11px;color:#5a4e35;text-align:center;padding:0 8px">look at top 3, rearrange</div></div>
+                <div style="width:118px;height:150px;border:2px dashed #c3b997;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;animation:stickpop .5s ease-out both;animation-delay:.31s"><div style="background:#7ba36f;color:#12331d;font-family:'Permanent Marker';font-size:15px;padding:8px 12px;border-radius:4px;box-shadow:1px 3px 4px rgba(0,0,0,.3);transform:rotate(-4deg);text-align:center">DOORSTOP</div><div style="font-family:'Patrick Hand';font-size:11px;color:#5a4e35;text-align:center;padding:0 8px">can't be destroyed by combat this turn</div></div>
+                <div style="width:118px;height:150px;border:2px dashed #c3b997;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;animation:stickpop .5s ease-out both;animation-delay:.44s"><div style="background:#e6a793;color:#4a1c12;font-family:'Permanent Marker';font-size:14px;padding:8px 12px;border-radius:4px;box-shadow:1px 3px 4px rgba(0,0,0,.3);transform:rotate(6deg);text-align:center">SHORT FUSE</div><div style="font-family:'Patrick Hand';font-size:11px;color:#5a4e35;text-align:center;padding:0 8px">mill 3 from their deck; destroy this</div></div>
+                <div style="width:118px;height:150px;border:2px dashed #c8a9d6;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;animation:stickpop .6s ease-out both;animation-delay:.6s;background:rgba(200,169,214,.14)"><span style="font-family:'Permanent Marker';font-size:10px;color:#8f3f74;transform:rotate(-4deg)">★ RARE ★</span><div style="background:#c8a9d6;color:#3a1c33;font-family:'Permanent Marker';font-size:13px;padding:8px 12px;border-radius:4px;transform:rotate(-3deg);text-align:center;animation:shimmer 1.6s ease-in-out infinite">SECOND CHANCE</div><div style="font-family:'Patrick Hand';font-size:11px;color:#5a2c4d;text-align:center;padding:0 8px">first destruction each game prevented</div></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center">
+              <button onClick="{{ pick }}" style="font-family:'Permanent Marker';font-size:15px;color:#fff;background:#2f6d4f;border:none;border-radius:4px;padding:10px 20px;cursor:pointer;box-shadow:0 3px 5px rgba(0,0,0,.3);transform:rotate(-1deg)">STICK ONE ON A CARD</button>
+              <button onClick="{{ again }}" style="font-family:'Permanent Marker';font-size:15px;color:#3a2f14;background:#F4E04D;border:none;border-radius:4px;padding:10px 20px;cursor:pointer;box-shadow:0 3px 5px rgba(0,0,0,.3);transform:rotate(1deg)">↺ another pack</button>
+            </div>
+            <sc-if value="{{ msg }}" hint-placeholder-val="{{ false }}">
+              <div style="font-family:'Patrick Hand';font-size:14px;color:#8f3f74">{{ msg }}</div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+
+      <!-- TRADE BINDER pack rack -->
+      <div style="width:240px;flex:none;background-color:#8fa9c9;background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.08) 0 1px,transparent 1px 12px);border-radius:6px;box-shadow:0 6px 16px rgba(0,0,0,.3);padding:18px 18px;transform:rotate(.4deg);position:relative">
+        <div style="position:absolute;top:0;bottom:0;left:14px;width:8px;background:repeating-linear-gradient(#2B4C9B 0 4px,#8fa9c9 4px 22px)"></div>
+        <div style="font-family:'Permanent Marker';font-size:18px;color:#1c2a3a;margin-left:14px;margin-bottom:4px">📒 TRADE BINDER</div>
+        <div style="font-family:'Patrick Hand';font-size:12px;color:#2f4257;margin-left:14px;margin-bottom:14px">pick a pack to open →</div>
+        <div style="display:flex;flex-direction:column;gap:14px;margin-left:14px">
+          <button onClick="{{ pickCommon }}" style="text-align:left;cursor:pointer;border:2px solid #1F1D1B;border-radius:6px;background-color:#E7D7A9;background-image:repeating-linear-gradient(28deg,rgba(255,255,255,.18) 0 8px,transparent 8px 18px);padding:13px;box-shadow:0 3px 5px rgba(0,0,0,.3);transform:rotate(-1deg)"><div style="font-family:'Permanent Marker';font-size:15px;color:#5a4e35">CORNER STORE PACK</div><div style="font-family:'Patrick Hand';font-size:12px;color:#6b5f45">🪙 6 · cheap · common-weighted</div></button>
+          <button onClick="{{ pickRare }}" style="text-align:left;cursor:pointer;border:2px solid #8f3f74;border-radius:6px;background-color:#c8a9d6;background-image:repeating-linear-gradient(28deg,rgba(255,255,255,.2) 0 8px,transparent 8px 18px);padding:13px;box-shadow:0 3px 5px rgba(0,0,0,.3);transform:rotate(1deg);animation:shimmer 1.8s ease-in-out infinite"><div style="font-family:'Permanent Marker';font-size:15px;color:#3a1c33">★ TRADE BINDER PACK ★</div><div style="font-family:'Patrick Hand';font-size:12px;color:#5a2c4d">🪙 12 · pricey · guaranteed rare</div></button>
+        </div>
+        <div style="margin-left:14px;margin-top:16px;font-family:'Patrick Hand';font-size:13px;color:#2f4257;transform:rotate(-.6deg);border-top:2px dashed rgba(31,29,27,.25);padding-top:10px">no exploding packs here — you <b>peel</b> the corner slow &amp; the stickers reveal one by one 🐌</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { scale: 1, opened: false, packName: 'CORNER STORE PACK', packColor: '#E7D7A9', msg: '' };
+  componentDidMount() { this.fit(); this._r = () => this.fit(); window.addEventListener('resize', this._r); }
+  componentWillUnmount() { window.removeEventListener('resize', this._r); }
+  fit() { this.setState({ scale: Math.min(window.innerWidth / 1600, window.innerHeight / 900) }); }
+  renderVals() {
+    return {
+      boardScale: this.state.scale,
+      opened: this.state.opened, sealed: !this.state.opened,
+      packName: this.state.packName, packColor: this.state.packColor, msg: this.state.msg,
+      rip: () => this.setState({ opened: true, msg: '' }),
+      again: () => this.setState({ opened: false, msg: '' }),
+      pick: () => this.setState({ msg: '✎ pick a card on your desk to slap it on…' }),
+      buy: () => this.setState({ msg: '✎ bought! added to your run.' }),
+      pickCommon: () => this.setState({ packName: 'CORNER STORE PACK', packColor: '#E7D7A9', opened: false, msg: '' }),
+      pickRare: () => this.setState({ packName: 'TRADE BINDER PACK', packColor: '#c8a9d6', opened: false, msg: '' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

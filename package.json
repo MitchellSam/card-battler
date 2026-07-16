@@ -1,0 +1,17 @@
+{
+  "name": "house-rules",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "npm run test -w @house-rules/engine",
+    "typecheck": "npm run typecheck -w @house-rules/engine",
+    "gen:rules-gaps": "node scripts/gen-rules-gaps.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vitest": "^3.0.0"
+  }
+}
