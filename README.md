@@ -8,6 +8,7 @@ house-ruling their own card game. Design docs:
 - [M2_IMPLEMENTATION_BRIEF.md](M2_IMPLEMENTATION_BRIEF.md) — sim harness + heuristic agents
 - [M2.5_IMPLEMENTATION_BRIEF.md](M2.5_IMPLEMENTATION_BRIEF.md) — ratified rules changes + re-simulation
 - [M2-FINDINGS.md](M2-FINDINGS.md) — pacing verdicts + designer decisions (M2 data + M2.5 addendum)
+- [M3_IMPLEMENTATION_BRIEF.md](M3_IMPLEMENTATION_BRIEF.md) — browser prototype (playable vs greedy AI)
 - [RULES-GAPS.md](RULES-GAPS.md) — generated list of open rules questions found during implementation (decide with the designers)
 
 ## Layout
@@ -22,6 +23,15 @@ npm workspaces, no monorepo tooling.
   aggro, turtle, banker, greedy) that see only `PlayerView`, a deterministic
   game runner (seed reproduces the exact game, agent decisions included), JSONL
   per-game records, outlier replay capture, and a markdown report generator.
+  The `@house-rules/sim/browser` subpath exports the node-free subset (agents,
+  `actorFor`, `agentSeed`) for the web client.
+- `packages/web` — **M3: browser prototype** (Vite + React). Playable duel vs
+  the greedy agent. The UI contains zero rules logic: every affordance is a
+  filter over `legalActions()`, prompts come from `state.pending`, whose-turn
+  comes from the sim's `actorFor`, and components render only from
+  `viewFor(state, HUMAN)` + the event log. `GameSession` (plain TS, headless-
+  tested) owns the full state, RNGs, logs, AI pacing, auto-pass, decision-time
+  instrumentation, and deterministic replay export.
 - `results/` — experiment outputs. `E*` = historical M2 runs (pre-ratification
   rules), `R0`/`R1`/`R4` = current-rules baseline matrix, ante sweep, and
   first-turn-draw experiment. Only the `REPORT.md` files are checked in; raw
@@ -33,8 +43,9 @@ npm workspaces, no monorepo tooling.
 
 ```sh
 npm install
-npm test             # engine + sim test suites (Vitest)
+npm test             # engine + sim + web test suites (Vitest)
 npm run typecheck    # tsc --noEmit, strict, all workspaces
+npm run web          # serve the M3 duel prototype (Vite dev server)
 npm run bench        # random-agent games/sec floor check (target ≥100/s)
 npm run sim -- run --p0 greedy --p1 turtle --games 10000 --seed 1 --out results/dir
 npm run sim -- report results/dir --out results/dir/REPORT.md
@@ -74,5 +85,18 @@ npm run gen:rules-gaps
   quads winning hands), zero crashes/stalls across 870k+ games. Open items for
   the designers: ante value, banker-mirror second-player edge, K+Ace-as-11
   as premier removal.
-- Next: **M3** — browser prototype (ugly, playable vs AI). The greedy agent is
-  the intended v1 opponent.
+- **M3 (browser prototype): implemented, awaiting the human gate.** `npm run
+  web` serves a full duel vs greedy from a shown seed. Every action type and
+  pending decision from the brief's inventory is operable (mulligan multi-
+  select, summon with sacrifice cascade, set/cast spells with the full target
+  cascade, Joker, attacks + direct, bank triggers, flip targets, interceptor,
+  wall-punish pick, Poly hit/stand + Ace 1-or-11, response windows with
+  auto-pass). EndScreen reports wall-clock minutes, turns, human decision
+  count and mean seconds-per-decision (clocked only while the human holds the
+  decision), and exports a deterministic replay (verified: re-running the
+  action log through the engine reproduces the same `GameResult`). Dev panel:
+  seed/restart, agent picker, AI delay, auto-pass toggle, loud reveal-all,
+  wall-punish selector (to smoke-test the pick prompt), greedy
+  decide-for-me. Cheat Sheet ships as a visibly-placeholder page with the
+  canon corrections list. **Remaining exit gate: the brother completes a full
+  duel in-browser and the wall-clock number goes to the design chat.**

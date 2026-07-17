@@ -8,6 +8,7 @@
   "scripts": {
     "test": "npm run test --workspaces",
     "typecheck": "npm run typecheck --workspaces",
+    "web": "npm run dev -w @house-rules/web",
     "sim": "tsx packages/sim/src/cli.ts",
     "bench": "tsx packages/sim/src/cli.ts bench",
     "gen:rules-gaps": "node scripts/gen-rules-gaps.mjs"
