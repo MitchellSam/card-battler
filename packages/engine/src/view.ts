@@ -57,7 +57,6 @@ export interface PlayerView {
   normalSummonUsed: boolean;
   you: SideView;
   opponent: SideView;
-  deckOut: boolean;
   result: GameResult | null;
 }
 
@@ -104,7 +103,6 @@ export function viewFor(state: GameState, player: PlayerId): PlayerView {
     normalSummonUsed: state.normalSummonUsed,
     you: sideView(state, player, player),
     opponent: sideView(state, opponent, player),
-    deckOut: state.deckOut,
     result: state.result,
   };
 }

@@ -78,9 +78,17 @@ describe('flip effects', () => {
     r = resolveStack(r.state, rng0());
     expect(r.state.players[1].graveyard).toHaveLength(2);
     expect(r.state.players[1].deck).toHaveLength(0);
-    // deck hit zero → game over once the stack finished; K-high beats 4-high
-    expect(r.state.phase).toBe('gameOver');
-    expect(r.state.result?.winner).toBe(0);
+    // M2.5 §2: milling to zero does NOT end the game — p1's next draw phase does.
+    expect(r.state.phase).not.toBe('gameOver');
+    const ended = run(
+      r.state,
+      rng0(),
+      { type: 'nextPhase', player: 0 }, // → battle
+      { type: 'nextPhase', player: 0 }, // → main2
+      { type: 'nextPhase', player: 0 }, // → end → p1's draw phase finds nothing
+    );
+    expect(ended.state.phase).toBe('gameOver');
+    expect(ended.state.result?.winner).toBe(0); // K-high beats 4-high
   });
 
   it('8 destroys all attack-position monsters on both sides; defense survives', () => {

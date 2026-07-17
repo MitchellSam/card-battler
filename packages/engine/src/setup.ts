@@ -24,6 +24,33 @@ export interface SetupOptions {
   skipMulligan?: boolean;
 }
 
+/**
+ * M2.5 §11 ante: after mulligans, each player moves config.ante cards from the
+ * top of their shuffled deck to their PUBLIC bank. Jokers are never bankable:
+ * an ante'd Joker is shuffled back and a different card is ante'd.
+ */
+export function performAnte(state: GameState, rng: SeededRNG, events: GameEvent[]): void {
+  if (state.config.ante <= 0) return;
+  for (const p of [0, 1] as PlayerId[]) {
+    const ps = state.players[p];
+    for (let i = 0; i < state.config.ante; i++) {
+      let card = ps.deck.shift();
+      while (card && card.rank === 'JOKER') {
+        ps.deck.push(card);
+        shuffle(ps.deck, rng);
+        if (ps.deck.every((c) => c.rank === 'JOKER')) {
+          card = undefined;
+          break;
+        }
+        card = ps.deck.shift();
+      }
+      if (!card) break; // deck exhausted (only reachable with pathological ante values)
+      ps.bank.push(card);
+      events.push({ type: 'CardBanked', player: p, cardId: card.id, cause: 'ante' });
+    }
+  }
+}
+
 function emptyPlayer(config: RulesConfig, deck: GameCard[]): PlayerState {
   return {
     deck,
@@ -66,7 +93,6 @@ export function setupGame(
     normalSummonUsed: false,
     nextUid: 1,
     nextStackId: 1,
-    deckOut: false,
     result: null,
   };
 
@@ -80,8 +106,17 @@ export function setupGame(
 
   events.push({ type: 'GameStarted', firstPlayer });
   if (options.skipMulligan) {
-    // First player skips their first draw step, so turn 1 begins immediately.
+    performAnte(state, rng, events); // ante happens after mulligans (here: skipped)
     events.push({ type: 'TurnStarted', turn: 1, player: firstPlayer });
+    // Canonical: first player skips their turn-1 draw phase. The experiment
+    // knob restores it (deck is always deep enough here to draw safely).
+    if (config.firstTurnDraw) {
+      const ps = state.players[firstPlayer];
+      const drawn = ps.deck.splice(0, config.drawPerTurn);
+      ps.hand.push(...drawn);
+      if (drawn.length > 0)
+        events.push({ type: 'CardsDrawn', player: firstPlayer, count: drawn.length, cardIds: drawn.map((c) => c.id) });
+    }
   }
   return { state, events };
 }

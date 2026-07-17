@@ -2,3 +2,8 @@ node_modules/
 dist/
 *.tsbuildinfo
 .DS_Store
+
+# Sim outputs: only the REPORT.md files are checked in. Raw per-game JSONL
+# (700MB+) and outlier replays are regenerable from their seeds (deterministic).
+results/**/*.jsonl
+results/**/replays/

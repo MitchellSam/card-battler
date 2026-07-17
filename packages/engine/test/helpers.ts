@@ -119,7 +119,6 @@ export function makeState(opts: StateOpts = {}): GameState {
     normalSummonUsed: opts.normalSummonUsed ?? false,
     nextUid: maxUid + 1,
     nextStackId: 1,
-    deckOut: false,
     result: null,
   };
 }

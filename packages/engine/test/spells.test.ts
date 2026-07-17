@@ -189,9 +189,28 @@ describe('spells & the stack', () => {
     expect(effectivePower(r.state.players[0].monsters[0]!)).toBe(4);
   });
 
-  it('K permanently debuffs an opposing monster, floored at 0', () => {
+  it('K debuff below 1 power destroys the monster — no floor, no bank trigger (M2.5 §6)', () => {
     const s = makeState({
       p0: { hand: [card(0, 'K', '♥'), card(0, '9', '♥')] },
+      p1: { monsters: [mon(card(1, '6', '♦'), 'attack', 1)] },
+    });
+    const r = run(
+      s,
+      rng0(),
+      { type: 'castSpell', player: 0, source: { from: 'hand', handIndex: 0 }, mode: 'rank', targetMonsterUid: 1, discardHandIndex: 1 },
+      { type: 'pass', player: 0 },
+      { type: 'pass', player: 1 },
+    );
+    expect(r.state.players[1].monsters[0]).toBeNull(); // 6 - 9 ≤ 0 → destroyed
+    expect(r.state.players[1].graveyard.map((c) => c.id)).toContain('1:6♦');
+    const death = r.events.find((e) => e.type === 'MonsterDestroyed');
+    expect(death?.cause).toBe('debuff');
+    expect(r.state.pending).toBeNull(); // debuff destruction is not combat
+  });
+
+  it('K debuff that leaves power ≥ 1 is permanent (survives end of turn)', () => {
+    const s = makeState({
+      p0: { hand: [card(0, 'K', '♥'), card(0, '4', '♥')] },
       p1: { monsters: [mon(card(1, '6', '♦'), 'attack', 1)] },
     });
     let r = run(
@@ -201,9 +220,7 @@ describe('spells & the stack', () => {
       { type: 'pass', player: 0 },
       { type: 'pass', player: 1 },
     );
-    const m = r.state.players[1].monsters[0]!;
-    expect(m.power).toBe(0); // 6 - 9 floored
-    // permanent: survives end of turn
+    expect(r.state.players[1].monsters[0]!.power).toBe(2); // 6 - 4
     r = run(
       r.state,
       rng0(),
@@ -211,7 +228,7 @@ describe('spells & the stack', () => {
       { type: 'nextPhase', player: 0 },
       { type: 'nextPhase', player: 0 },
     );
-    expect(r.state.players[1].monsters[0]!.power).toBe(0);
+    expect(r.state.players[1].monsters[0]!.power).toBe(2);
   });
 
   it('Q/K require a NUMBER card discard and a legal target side', () => {

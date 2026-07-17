@@ -22,6 +22,15 @@ describe('random playouts', () => {
         if (++steps > 30000) throw new Error(`seed ${seed}: game did not terminate`);
         const acts = [...legalActions(state, 0), ...legalActions(state, 1)];
         expect(acts.length, `seed ${seed} deadlock at step ${steps}`).toBeGreaterThan(0);
+        // legalActions is the sole gate: EVERY enumerated action must apply cleanly
+        if (steps <= 15) {
+          for (const a of acts) {
+            expect(
+              () => applyAction(state, a, createRng(1)),
+              `legal action failed to apply: ${JSON.stringify(a)}`,
+            ).not.toThrow();
+          }
+        }
         const action = acts[pick.int(acts.length)]!;
         const before = steps <= 25 ? serialize(state) : null;
         const r = applyAction(state, action, rng);
@@ -31,7 +40,7 @@ describe('random playouts', () => {
         state = r.state;
       }
       expect(state.result).not.toBeNull();
-      expect(state.deckOut).toBe(true);
+      expect(state.result?.stalled).toBe(false);
       // redacted views still render at game end
       expect(viewFor(state, 0).result).toEqual(state.result);
     }

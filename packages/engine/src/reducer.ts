@@ -17,6 +17,7 @@ import {
 import { hasAnyActivation } from './legal.js';
 import { showdown } from './poker.js';
 import { shuffle, type SeededRNG } from './rng.js';
+import { performAnte } from './setup.js';
 import {
   IllegalActionError,
   type Action,
@@ -26,6 +27,7 @@ import {
   type GameState,
   type Monster,
   type PlayerId,
+  type PlayerState,
   type StackItem,
   type Suit,
 } from './types.js';
@@ -37,6 +39,51 @@ interface Ctx {
 }
 
 const other = (p: PlayerId): PlayerId => (1 - p) as PlayerId;
+
+// ---------------------------------------------------------------------------
+// State cloning. Hand-written instead of structuredClone for sim throughput
+// (~10x): GameCard objects are immutable for the life of a game (the engine
+// only moves them between zones), so clones share card references and copy
+// every mutable container around them. config and result are never mutated
+// after creation and are shared too.
+// ---------------------------------------------------------------------------
+
+function cloneMonster(m: Monster): Monster {
+  const c: Monster = { ...m, tempAdds: m.tempAdds.map((b) => ({ ...b })) };
+  if (m.tempSet) c.tempSet = { ...m.tempSet };
+  return c;
+}
+
+function clonePlayer(ps: PlayerState): PlayerState {
+  return {
+    deck: ps.deck.slice(),
+    hand: ps.hand.slice(),
+    monsters: ps.monsters.map((m) => (m ? cloneMonster(m) : null)),
+    spellTraps: ps.spellTraps.map((st) => (st ? { ...st } : null)),
+    graveyard: ps.graveyard.slice(),
+    bank: ps.bank.slice(),
+    removed: ps.removed.slice(),
+    mulliganed: ps.mulliganed,
+  };
+}
+
+function cloneStackItem(item: StackItem): StackItem {
+  const c = { ...item };
+  if ('targetSTZone' in c && c.targetSTZone) c.targetSTZone = { ...c.targetSTZone };
+  if ('graveTarget' in c && c.graveTarget) c.graveTarget = { ...c.graveTarget };
+  return c;
+}
+
+function cloneState(s: GameState): GameState {
+  return {
+    ...s,
+    players: [clonePlayer(s.players[0]), clonePlayer(s.players[1])],
+    stack: s.stack.map(cloneStackItem),
+    pendingWindow: s.pendingWindow ? { ...s.pendingWindow } : null,
+    pending: s.pending ? { ...s.pending } : null,
+    poly: s.poly ? { ...s.poly, cardIds: s.poly.cardIds.slice() } : null,
+  };
+}
 
 function fail(message: string, action?: Action): never {
   throw new IllegalActionError(message, action);
@@ -60,13 +107,10 @@ function findMonster(s: GameState, uid: number | undefined): MonsterLoc | null {
   return null;
 }
 
-function markDeckOut(ctx: Ctx, player: PlayerId): void {
-  if (!ctx.s.deckOut) {
-    ctx.s.deckOut = true;
-    ctx.events.push({ type: 'DeckOut', player });
-  }
-}
-
+/**
+ * Effect draws (4-flip, Joker): partial where possible, and NEVER end the game
+ * (M2.5 §2 — the game ends only at a draw phase; see drawPhase).
+ */
 function drawCards(ctx: Ctx, player: PlayerId, count: number): void {
   const ps = ctx.s.players[player];
   const drawn: GameCard[] = [];
@@ -75,7 +119,6 @@ function drawCards(ctx: Ctx, player: PlayerId, count: number): void {
     if (!card) break;
     ps.hand.push(card);
     drawn.push(card);
-    if (ps.deck.length === 0) markDeckOut(ctx, player);
   }
   if (drawn.length > 0)
     ctx.events.push({
@@ -86,16 +129,16 @@ function drawCards(ctx: Ctx, player: PlayerId, count: number): void {
     });
 }
 
+/** Mills never end the game mid-turn either (M2.5 §2); short mills mill less. */
 function millCards(ctx: Ctx, player: PlayerId, count: number): void {
   const ps = ctx.s.players[player];
   const milled = ps.deck.splice(0, count);
   ps.graveyard.push(...milled);
-  if (ps.deck.length === 0 && milled.length > 0) markDeckOut(ctx, player);
   if (milled.length > 0)
     ctx.events.push({ type: 'CardsMilled', player, cardIds: milled.map((c) => c.id) });
 }
 
-function destroyMonster(ctx: Ctx, loc: MonsterLoc): void {
+function destroyMonster(ctx: Ctx, loc: MonsterLoc, cause?: string): void {
   ctx.s.players[loc.player].monsters[loc.zone] = null;
   ctx.s.players[loc.m.card.owner].graveyard.push(loc.m.card);
   ctx.events.push({
@@ -104,7 +147,24 @@ function destroyMonster(ctx: Ctx, loc: MonsterLoc): void {
     zoneIndex: loc.zone,
     uid: loc.m.uid,
     cardId: loc.m.card.id,
+    power: effectivePower(loc.m),
+    ...(cause ? { cause } : {}),
   });
+}
+
+/**
+ * M2.5 §6 (no debuff floor): any monster whose effective power is ≤ 0 is
+ * destroyed immediately upon the change. Not combat: no bank trigger, no
+ * wall-punish. Checked after debuffs and after end-of-turn buff expiry.
+ */
+function destroyDebuffed(ctx: Ctx): void {
+  for (const p of [0, 1] as PlayerId[]) {
+    const zones = ctx.s.players[p].monsters;
+    for (let zone = 0; zone < zones.length; zone++) {
+      const m = zones[zone];
+      if (m && effectivePower(m) <= 0) destroyMonster(ctx, { player: p, zone, m }, 'debuff');
+    }
+  }
 }
 
 function pushStack(ctx: Ctx, item: DistributiveOmit<StackItem, 'id'>): StackItem {
@@ -186,18 +246,13 @@ function doWallPunish(ctx: Ctx, attacker: PlayerId): void {
   }
 }
 
-function maybeEndGame(ctx: Ctx): boolean {
+function endGame(ctx: Ctx, stalled: boolean): void {
   const { s, events } = ctx;
-  if (s.phase === 'gameOver') return true;
-  if (!s.deckOut) return false;
-  // Finish resolving the current stack / decisions / Poly fully, then score.
-  if (s.stack.length > 0 || s.pending || s.poly) return false;
-  const result = showdown(s.players[0].bank, s.players[1].bank);
+  const result = { ...showdown(s.players[0].bank, s.players[1].bank), stalled };
   s.result = result;
   s.phase = 'gameOver';
   s.pendingWindow = null;
-  events.push({ type: 'GameEnded', winner: result.winner, hands: result.hands });
-  return true;
+  events.push({ type: 'GameEnded', winner: result.winner, hands: result.hands, stalled });
 }
 
 /**
@@ -208,9 +263,9 @@ function maybeEndGame(ctx: Ctx): boolean {
  */
 function resumeFlow(ctx: Ctx): void {
   const { s } = ctx;
+  if (s.phase === 'gameOver') return;
   s.passes = 0;
   s.priority = s.activePlayer;
-  if (maybeEndGame(ctx)) return;
   if (s.stack.length === 0 && !s.pending && !s.poly && s.pendingWindow) {
     const opp = other(s.activePlayer);
     if (hasAnyActivation(s, opp)) s.priority = opp;
@@ -250,16 +305,48 @@ function finishTurn(ctx: Ctx): void {
       m.tempAdds = m.tempAdds.filter((b) => b.expiresTurn > s.turn);
     }
   }
+  // A buff expiring can drop a debuffed monster to ≤ 0 power (M2.5 §6).
+  destroyDebuffed(ctx);
   events.push({ type: 'TurnEnded', turn: s.turn, player: s.activePlayer });
   s.turn += 1;
+  if (s.turn > s.config.maxTurns) {
+    events.push({ type: 'GameStalled', turn: s.turn - 1 });
+    endGame(ctx, true);
+    return;
+  }
   s.activePlayer = other(s.activePlayer);
   s.normalSummonUsed = false;
   s.phase = 'main1';
   s.priority = s.activePlayer;
   s.passes = 0;
   events.push({ type: 'TurnStarted', turn: s.turn, player: s.activePlayer });
-  drawCards(ctx, s.activePlayer, 1);
-  maybeEndGame(ctx);
+  drawPhase(ctx);
+}
+
+/**
+ * The draw phase is the ONLY place the game can end by deck-out (M2.5 §2):
+ * draw drawPerTurn cards one at a time; a draw due from an empty deck keeps
+ * whatever was already drawn and ends the game on the spot.
+ */
+function drawPhase(ctx: Ctx): void {
+  const { s, events } = ctx;
+  const player = s.activePlayer;
+  const ps = s.players[player];
+  const drawn: GameCard[] = [];
+  for (let i = 0; i < s.config.drawPerTurn; i++) {
+    const card = ps.deck.shift();
+    if (!card) {
+      if (drawn.length > 0)
+        events.push({ type: 'CardsDrawn', player, count: drawn.length, cardIds: drawn.map((c) => c.id) });
+      events.push({ type: 'DeckOut', player });
+      endGame(ctx, false);
+      return;
+    }
+    ps.hand.push(card);
+    drawn.push(card);
+  }
+  if (drawn.length > 0)
+    events.push({ type: 'CardsDrawn', player, count: drawn.length, cardIds: drawn.map((c) => c.id) });
 }
 
 // ---------------------------------------------------------------------------
@@ -340,15 +427,14 @@ function resolveSpell(ctx: Ctx, item: Extract<StackItem, { kind: 'spell' }>): vo
       if (!loc || loc.player === ctrl || loc.m.position === 'set')
         fizzle(ctx, item, 'target invalid');
       else {
-        // RULES-GAP: K debuff floor — power cannot go below 0; a 0-power monster
-        // stays on the field (YGO convention; docs silent on negative power).
-        loc.m.power = Math.max(0, loc.m.power - item.amount!);
+        loc.m.power -= item.amount!;
         events.push({
           type: 'PowerChanged',
           uid: loc.m.uid,
           power: effectivePower(loc.m),
           delta: -item.amount!,
         });
+        destroyDebuffed(ctx);
       }
       break;
     }
@@ -450,9 +536,8 @@ function resolveFlip(ctx: Ctx, item: Extract<StackItem, { kind: 'flip' }>): void
         break;
       }
       if (tloc.m.position === 'set') {
-        // RULES-GAP: flipping the battle position of a face-down monster:
-        // face-down defense → face-up ATTACK (a position flip is defense↔attack),
-        // and the face-down→face-up transition triggers its flip effect.
+        // Ratified (M2.5 §12): face-down defense → face-up ATTACK, and the
+        // face-down→face-up transition triggers its flip effect.
         tloc.m.position = 'attack';
         events.push({
           type: 'MonsterFlipped',
@@ -532,20 +617,32 @@ function resolveAttack(ctx: Ctx, item: Extract<StackItem, { kind: 'attack' }>): 
   const { s, events } = ctx;
   const aloc = findMonster(s, item.attackerUid);
   if (!aloc || aloc.m.position !== 'attack') {
-    // RULES-GAP: attacker destroyed / bounced / turned before the attack
-    // resolves — the attack fizzles and is spent (no re-declaration).
+    // Ratified (M2.5 §12): attacker destroyed / bounced / turned before the
+    // attack resolves — the attack is interrupted and spent (no re-declaration).
     fizzle(ctx, item, 'attacker no longer in attack position');
     return;
   }
   if (item.target === 'direct') {
-    if (s.players[other(item.controller)].monsters.some((m) => m !== null)) {
-      // RULES-GAP: a monster appeared in response to a direct attack — direct
-      // attacks are only legal against an empty board, so the attack fizzles.
-      fizzle(ctx, item, 'direct attack blocked by new monster');
+    const defender = other(item.controller);
+    const interceptors = s.players[defender].monsters.filter((m) => m !== null);
+    if (interceptors.length === 0) {
+      events.push({ type: 'CombatResolved', direct: true, attacker: item.controller });
+      awardBankTrigger(ctx, item.controller);
       return;
     }
-    events.push({ type: 'CombatResolved', direct: true, attacker: item.controller });
-    awardBankTrigger(ctx, item.controller);
+    // M2.5 §8: monsters that appeared under a direct attack intercept it.
+    if (interceptors.length === 1) {
+      interceptAttack(ctx, item.controller, item.attackerUid, interceptors[0]!.uid);
+      return;
+    }
+    // RULES-GAP: (provisional, M2.5 §8) multiple monsters appeared — the
+    // DEFENDER chooses which one intercepts.
+    s.pending = {
+      type: 'interceptor',
+      player: defender,
+      attackerUid: item.attackerUid,
+      attacker: item.controller,
+    };
     return;
   }
   const tloc = findMonster(s, item.target);
@@ -553,6 +650,12 @@ function resolveAttack(ctx: Ctx, item: Extract<StackItem, { kind: 'attack' }>): 
     fizzle(ctx, item, 'attack target left the field');
     return;
   }
+  attackMonster(ctx, item.controller, item.attackerUid, tloc);
+}
+
+/** Resolve an attack against a specific monster: flip-then-combat if it's set. */
+function attackMonster(ctx: Ctx, attackingPlayer: PlayerId, attackerUid: number, tloc: MonsterLoc): void {
+  const { events } = ctx;
   if (tloc.m.position === 'set') {
     // Flip it face-up first; its flip effect triggers and resolves, THEN combat.
     tloc.m.position = 'defense';
@@ -565,14 +668,25 @@ function resolveAttack(ctx: Ctx, item: Extract<StackItem, { kind: 'attack' }>): 
     });
     pushStack(ctx, {
       kind: 'combat',
-      controller: item.controller,
-      attackerUid: item.attackerUid,
-      targetUid: item.target,
+      controller: attackingPlayer,
+      attackerUid,
+      targetUid: tloc.m.uid,
     });
     queueFlipTrigger(ctx, tloc);
     return;
   }
-  resolveCombat(ctx, item.attackerUid, item.target);
+  resolveCombat(ctx, attackerUid, tloc.m.uid);
+}
+
+function interceptAttack(ctx: Ctx, attackingPlayer: PlayerId, attackerUid: number, interceptorUid: number): void {
+  const tloc = findMonster(ctx.s, interceptorUid)!;
+  ctx.events.push({
+    type: 'AttackIntercepted',
+    attacker: attackingPlayer,
+    attackerUid,
+    interceptorUid,
+  });
+  attackMonster(ctx, attackingPlayer, attackerUid, tloc);
 }
 
 function resolveCombat(ctx: Ctx, attackerUid: number, targetUid: number): void {
@@ -602,30 +716,31 @@ function resolveCombat(ctx: Ctx, attackerUid: number, targetUid: number): void {
     defenderPosition,
   });
 
+  if (cmp === 0) {
+    // M2.5 §9: mirror combat (identical power AND suit — naturally only the
+    // twin card from the other deck): both destroyed regardless of the
+    // defender's position; a tie is neither a win nor a loss, so no bank
+    // trigger and no wall-punish.
+    destroyMonster(ctx, tloc);
+    destroyMonster(ctx, aloc);
+    return;
+  }
   if (defenderPosition === 'attack') {
     if (cmp > 0) {
       destroyMonster(ctx, tloc);
       awardBankTrigger(ctx, aloc.player);
-    } else if (cmp < 0) {
+    } else {
       destroyMonster(ctx, aloc);
       awardBankTrigger(ctx, tloc.player); // winner of an attack-vs-attack fight gets the choice regardless of who declared
-    } else {
-      // True tie (identical power and suit — two decks): mutual destroy, no bank trigger.
-      destroyMonster(ctx, tloc);
-      destroyMonster(ctx, aloc);
     }
     return;
   }
   // Attack vs defense (set monsters were flipped face-up before combat)
   if (cmp > 0) {
     destroyMonster(ctx, tloc); // no bank trigger against a wall
-  } else if (cmp < 0) {
+  } else {
     destroyMonster(ctx, aloc);
     doWallPunish(ctx, aloc.player);
-  } else {
-    // RULES-GAP: attacker power exactly equals defender power AND suit (mirror
-    // card into a wall): nothing is destroyed, no wall-punish (YGO convention).
-    events.push({ type: 'CombatResolved', stalemate: true, attackerUid, targetUid });
   }
 }
 
@@ -633,30 +748,44 @@ function resolveCombat(ctx: Ctx, attackerUid: number, targetUid: number): void {
 // Polymerization (♦): blackjack sub-state-machine inside the stack
 // ---------------------------------------------------------------------------
 
+/**
+ * M2.5 §5: the blackjack total STARTS at the target monster's card value —
+ * number = face value (Ace: caster chooses 1/11 via the polyAce pending),
+ * face card (Recast typeOverride only) = 10. The target's card is not drawn
+ * or milled; it contributes value and remains the monster being fused.
+ */
 function startPoly(ctx: Ctx, caster: PlayerId, targetUid: number): void {
   const { s, events } = ctx;
-  s.poly = {
-    caster,
-    targetUid,
-    total: 0,
-    dealsRemaining: s.config.polyInitialDeal,
-    cardIds: [],
-  };
+  const target = findMonster(s, targetUid)!;
+  s.poly = { caster, targetUid, total: 0, dealsRemaining: 0, cardIds: [] };
   events.push({ type: 'PolyStarted', caster, targetUid });
+  if (target.m.card.rank === 'A') {
+    s.pending = { type: 'polyAce', player: caster };
+    return; // resumes via handlePolyAce → continuePoly
+  }
+  s.poly.total = polyValue(target.m.card.rank);
   continuePoly(ctx);
 }
 
-/** Deal one card; returns false when the flow is suspended (Ace choice) or finished. */
 function polyDeal(ctx: Ctx): 'dealt' | 'pendingAce' | 'deckEmpty' {
   const { s, events } = ctx;
   const poly = s.poly!;
   const ps = s.players[poly.caster];
-  const card = ps.deck.shift();
+  let card = ps.deck.shift();
+  // M2.5 §7: a Joker drawn as a Poly hit is shuffled back in and the hit redrawn.
+  while (card && card.rank === 'JOKER') {
+    ps.deck.push(card);
+    events.push({ type: 'PolyJokerReshuffled', player: poly.caster, cardId: card.id });
+    shuffle(ps.deck, ctx.rng);
+    // RULES-GAP: (provisional, M2.5 §7) if the deck contains no non-Joker cards
+    // the hit fails and the caster is forced to STAND on the current total.
+    if (ps.deck.every((c) => c.rank === 'JOKER')) return 'deckEmpty';
+    card = ps.deck.shift();
+  }
   if (!card) return 'deckEmpty';
   ps.graveyard.push(card); // all drawn cards go to the caster's graveyard regardless of outcome
   poly.cardIds.push(card.id);
   events.push({ type: 'PolyCardDrawn', player: poly.caster, cardId: card.id });
-  if (ps.deck.length === 0) markDeckOut(ctx, poly.caster);
   if (card.rank === 'A') {
     // Caster chooses 1 or 11 at the moment it is drawn (irrevocable).
     s.pending = { type: 'polyAce', player: poly.caster };
@@ -674,15 +803,9 @@ function continuePoly(ctx: Ctx): void {
     const outcome = polyDeal(ctx);
     if (outcome === 'pendingAce') return; // resumes via the polyAce decision
     if (outcome === 'deckEmpty') {
-      // RULES-GAP: deck runs out mid-Polymerization. If nothing was ever dealt
-      // the effect fizzles; otherwise the caster is forced to STAND on the
-      // current total. Docs silent; deck-out clock is already ticking.
-      if (poly.cardIds.length === 0) {
-        ctx.events.push({ type: 'EffectFizzled', kind: 'poly', reason: 'deck empty' });
-        endPoly(ctx);
-      } else {
-        polyStandFinish(ctx);
-      }
+      // M2.5 §2: mid-Poly deck-out forces a STAND on the current total; the
+      // game itself only ends at the next failed draw phase.
+      polyStandFinish(ctx);
       return;
     }
     if (poly.total > 21) {
@@ -776,10 +899,12 @@ function handleMulligan(ctx: Ctx, action: Extract<Action, { type: 'mulligan' }>)
   ps.mulliganed = true;
   events.push({ type: 'MulliganTaken', player: action.player, count: returned.length });
   if (s.players[0].mulliganed && s.players[1].mulliganed) {
+    performAnte(s, rng, events); // M2.5 §11: ante fires once, after mulligans
     s.phase = 'main1';
     s.priority = s.activePlayer;
-    // First player skips their first draw step: turn 1 starts with no draw.
     events.push({ type: 'TurnStarted', turn: 1, player: s.activePlayer });
+    // Canonical: first player skips their turn-1 draw phase (compensation).
+    if (s.config.firstTurnDraw) drawPhase(ctx);
   }
 }
 
@@ -851,9 +976,8 @@ function handleFlipMonster(ctx: Ctx, action: Extract<Action, { type: 'flipMonste
   const m = ps.monsters[action.zoneIndex];
   if (!m) fail('no monster in zone', action);
   if (m.position !== 'set') fail('monster is not set', action);
-  // RULES-GAP: the docs say flipping set→attack is "always allowed"; read as
-  // exempt from the once-per-turn position-change limit, NOT from the YGO rule
-  // that a monster cannot be flip-summoned the turn it was set.
+  // Ratified (M2.5 §12): "always allowed" = exempt from the once-per-turn
+  // position-change limit, but never the turn it was set.
   if ((m.setTurn ?? 0) >= s.turn) fail('cannot flip the turn it was set', action);
   m.position = 'attack';
   events.push({
@@ -933,8 +1057,16 @@ function handleCastSpell(ctx: Ctx, action: Extract<Action, { type: 'castSpell' }
         fail('cannot discard the spell itself', action);
       const dc = ps.hand[di];
       if (!dc || !isNumberRank(dc.rank)) fail('discard must be a number card', action);
+      // M2.5 §4: an Ace discarded as Q/K fuel is 1 or 11, caster's choice at cast time.
+      if (dc.rank === 'A') {
+        if (action.aceValue !== 1 && action.aceValue !== 11)
+          fail('discarding an Ace requires aceValue 1 or 11', action);
+        amount = action.aceValue;
+      } else {
+        if (action.aceValue !== undefined) fail('aceValue is only legal with an Ace discard', action);
+        amount = numberValue(dc.rank);
+      }
       discarded = dc;
-      amount = numberValue(dc.rank);
       break;
     }
     case 'negate': {
@@ -1003,6 +1135,7 @@ function handleCastSpell(ctx: Ctx, action: Extract<Action, { type: 'castSpell' }
     cardId: card.id,
     effect,
     stackItemId: item.id,
+    ...(amount !== undefined ? { amount } : {}), // Q/K fuel value (11 ⇒ Ace-as-11)
   });
 }
 
@@ -1066,8 +1199,11 @@ function handleNextPhase(ctx: Ctx, action: Extract<Action, { type: 'nextPhase' }
   if (s.activePlayer !== action.player) fail('not your turn', action);
   if (s.stack.length > 0) fail('stack must be empty', action);
   if (s.pendingWindow) fail('phase change already in progress', action);
-  const to = s.phase === 'main1' ? 'battle' : s.phase === 'battle' ? 'main2' : s.phase === 'main2' ? 'end' : null;
+  let to: 'battle' | 'main2' | 'end' | null =
+    s.phase === 'main1' ? 'battle' : s.phase === 'battle' ? 'main2' : s.phase === 'main2' ? 'end' : null;
   if (!to) fail(`cannot advance from phase ${s.phase}`, action);
+  // M2.5 §3: the first player's turn 1 has no Battle Phase — main1 skips to main2.
+  if (to === 'battle' && s.turn === 1 && !s.config.firstTurnBattle) to = 'main2';
   s.pendingWindow = { to };
   // Opponent gets a response window; auto-close it if they cannot act.
   const opp = other(action.player);
@@ -1154,6 +1290,23 @@ function handleChooseFlipTarget(ctx: Ctx, action: Extract<Action, { type: 'choos
   resumeFlow(ctx);
 }
 
+function handleChooseInterceptor(ctx: Ctx, action: Extract<Action, { type: 'chooseInterceptor' }>): void {
+  const { s } = ctx;
+  if (s.pending?.type !== 'interceptor' || s.pending.player !== action.player)
+    fail('no interceptor choice pending for you', action);
+  const loc = findMonster(s, action.monsterUid);
+  if (!loc || loc.player !== action.player) fail('interceptor must be your monster', action);
+  const { attacker, attackerUid } = s.pending;
+  s.pending = null;
+  const aloc = findMonster(s, attackerUid);
+  if (!aloc || aloc.m.position !== 'attack') {
+    ctx.events.push({ type: 'EffectFizzled', kind: 'attack', reason: 'attacker no longer in attack position' });
+  } else {
+    interceptAttack(ctx, attacker, attackerUid, action.monsterUid);
+  }
+  resumeFlow(ctx);
+}
+
 function handleWallPunishPick(ctx: Ctx, action: Extract<Action, { type: 'wallPunishPick' }>): void {
   const { s } = ctx;
   if (s.pending?.type !== 'wallPunishPick' || s.pending.player !== action.player)
@@ -1201,7 +1354,7 @@ export function applyAction(
 ): { state: GameState; events: GameEvent[] } {
   if (state.phase === 'gameOver') fail('game is over', action);
   if (action.player !== 0 && action.player !== 1) fail('bad player id', action);
-  const s = structuredClone(state);
+  const s = cloneState(state);
   const events: GameEvent[] = [];
   const ctx: Ctx = { s, events, rng };
   switch (action.type) {
@@ -1243,6 +1396,9 @@ export function applyAction(
       break;
     case 'chooseFlipTarget':
       handleChooseFlipTarget(ctx, action);
+      break;
+    case 'chooseInterceptor':
+      handleChooseInterceptor(ctx, action);
       break;
     case 'wallPunishPick':
       handleWallPunishPick(ctx, action);

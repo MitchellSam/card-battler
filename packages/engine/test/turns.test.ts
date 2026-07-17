@@ -17,7 +17,7 @@ describe('turn structure', () => {
     expect(r.state.turn).toBe(6);
     expect(r.state.activePlayer).toBe(1);
     expect(r.state.phase).toBe('main1');
-    expect(r.state.players[1].hand.length).toBe(handBefore + 1); // draw 1
+    expect(r.state.players[1].hand.length).toBe(handBefore + 2); // drawPerTurn = 2 (M2.5)
   });
 
   it('enforces the hand limit at end of turn, one discard at a time', () => {
@@ -52,10 +52,10 @@ describe('turn structure', () => {
       p0: { bank: [card(0, '5', '♥'), card(0, '5', '♦')] },
     });
     const r = applyAction(s, { type: 'nextPhase', player: 0 }, rng0());
-    // p1 drew their last card → deck 0 → game over. Partial banks compare by
-    // HIGH CARD (provisional rule): K-high beats the pair of 5s.
+    // p1 drew their last card and the second draw (drawPerTurn 2) came up
+    // empty → game over mid-draw. §10 partial scoring: the pair of 5s beats K-high.
     expect(r.state.phase).toBe('gameOver');
-    expect(r.state.result?.winner).toBe(1);
+    expect(r.state.result?.winner).toBe(0);
     expect(() => applyAction(r.state, { type: 'nextPhase', player: 1 }, rng0())).toThrow();
     expect(legalActions(r.state, 0)).toHaveLength(0);
   });

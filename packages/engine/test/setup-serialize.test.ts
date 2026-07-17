@@ -68,6 +68,43 @@ describe('serialization', () => {
     expect(deserialize(serialize(mid))).toEqual(mid);
   });
 
+  it('round-trips mid-game with a populated stack and pending decision, and play continues identically', () => {
+    const rng = createRng(5);
+    // a spell on the stack…
+    const s1 = makeState({
+      p0: { hand: [card(0, 'J', '♥')] },
+      p1: { monsters: [mon(card(1, '9', '♦'), 'attack', 1)] },
+    });
+    const withStack = applyAction(
+      s1,
+      { type: 'castSpell', player: 0, source: { from: 'hand', handIndex: 0 }, mode: 'rank', targetMonsterUid: 1 },
+      rng,
+    ).state;
+    expect(withStack.stack).toHaveLength(1);
+    expect(serialize(deserialize(serialize(withStack)))).toBe(serialize(withStack));
+    // …continues identically after a round-trip
+    const cont = (st: typeof withStack) =>
+      run(st, createRng(9), { type: 'pass', player: 0 }, { type: 'pass', player: 1 }).state;
+    expect(serialize(cont(deserialize(serialize(withStack))))).toBe(serialize(cont(withStack)));
+
+    // …and with a pending decision mid-combat (flip target choice)
+    const s2 = makeState({
+      phase: 'battle',
+      p0: { monsters: [mon(card(0, '7', '♠'), 'attack', 1)] },
+      p1: { monsters: [mon(card(1, '2', '♦'), 'set', 2)] },
+    });
+    const r = run(
+      s2,
+      createRng(6),
+      { type: 'declareAttack', player: 0, attackerZone: 0, targetZone: 0 },
+      { type: 'pass', player: 0 },
+      { type: 'pass', player: 1 },
+    ).state;
+    expect(r.pending?.type).toBe('flipTarget');
+    expect(r.stack.length).toBeGreaterThan(0);
+    expect(deserialize(serialize(r))).toEqual(r);
+  });
+
   it('rejects garbage', () => {
     expect(() => deserialize('{"nope":true}')).toThrow();
   });

@@ -6,11 +6,15 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "npm run test -w @house-rules/engine",
-    "typecheck": "npm run typecheck -w @house-rules/engine",
+    "test": "npm run test --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "sim": "tsx packages/sim/src/cli.ts",
+    "bench": "tsx packages/sim/src/cli.ts bench",
     "gen:rules-gaps": "node scripts/gen-rules-gaps.mjs"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.1",
     "typescript": "^5.5.4",
     "vitest": "^3.0.0"
   }

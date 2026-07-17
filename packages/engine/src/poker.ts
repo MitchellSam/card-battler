@@ -1,8 +1,9 @@
 // Poker-hand evaluator for the bank showdown.
-// Scoring: best 5-card hand from the entire bank; banks < 5 form a partial hand
-// that loses to any complete hand. Tie-breaks: standard kickers → suit order
-// (♠>♥>♣>♦) on the highest differing card → extended kickers over the rest of
-// the bank → true draw.
+// Scoring: best 5-card hand from the entire bank; banks < 5 score standard
+// categories over the cards available (M2.5 §10) and compete on the same
+// category scale. Tie-breaks: standard kickers → suit order (♠>♥>♣>♦) on the
+// highest differing card → extended kickers over the rest of the bank (an
+// extra card beats no card) → true draw.
 
 import { suitWeight } from './cards.js';
 import type { GameCard, HandResult, PlayerId } from './types.js';
@@ -99,13 +100,41 @@ export function evaluate5(cards: GameCard[]): ScoredHand {
   return { category, vector, cards: sorted };
 }
 
+/**
+ * Partial banks (<5 cards) score standard poker categories over the cards
+ * available (ratified M2.5 §10): pairs, two pair, trips, quads are valid;
+ * straights / flushes / full houses require 5 cards and are impossible.
+ * Categories compete on the same scale as full hands — a 2-card KK pair beats
+ * a 4-card (or 5-card) ace-high. Kickers then extended kickers as usual; an
+ * extra card beats no card on a prefix tie.
+ */
 function scorePartial(cards: GameCard[]): ScoredHand {
-  // RULES-GAP: partial banks (<5 cards) are compared "by high-card among
-  // themselves" — implemented as card-by-card rank comparison (pairs/flushes in
-  // a partial bank carry no weight); if one partial is a prefix-tie of a longer
-  // one, the longer bank wins (an extra card beats no card).
   const sorted = sortDesc(cards);
-  return { category: -1, vector: [-1, ...sorted.map(pokerRank)], cards: sorted };
+  const ranks = sorted.map(pokerRank);
+  const counts = new Map<number, number>();
+  for (const r of ranks) counts.set(r, (counts.get(r) ?? 0) + 1);
+  const groups = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0]);
+  const kickersAfter = (used: number[]) => ranks.filter((r) => !used.includes(r));
+
+  let category: number;
+  let vector: number[];
+  if (groups[0] && groups[0][1] === 4) {
+    category = 7;
+    vector = [7, groups[0][0], ...kickersAfter([groups[0][0]])];
+  } else if (groups[0] && groups[0][1] === 3) {
+    category = 3;
+    vector = [3, groups[0][0], ...kickersAfter([groups[0][0]])];
+  } else if (groups[0] && groups[0][1] === 2 && groups[1] && groups[1][1] === 2) {
+    category = 2;
+    vector = [2, groups[0][0], groups[1][0], ...kickersAfter([groups[0][0], groups[1][0]])];
+  } else if (groups[0] && groups[0][1] === 2) {
+    category = 1;
+    vector = [1, groups[0][0], ...kickersAfter([groups[0][0]])];
+  } else {
+    category = 0;
+    vector = [0, ...ranks];
+  }
+  return { category, vector, cards: sorted };
 }
 
 /** Lexicographic vector compare; on prefix tie, the longer vector wins. */
@@ -162,8 +191,16 @@ export function toHandResult(scored: ScoredHand): HandResult {
  * then 7th, etc.; if still identical the game is a draw.
  */
 export function compareBanks(bankA: GameCard[], bankB: GameCard[]): number {
-  const a = bestHand(bankA);
-  const b = bestHand(bankB);
+  return compareBanksScored(bestHand(bankA), bestHand(bankB), bankA, bankB);
+}
+
+/** compareBanks with pre-computed best hands (showdown evaluates each bank once). */
+function compareBanksScored(
+  a: ScoredHand,
+  b: ScoredHand,
+  bankA: GameCard[],
+  bankB: GameCard[],
+): number {
   const primary = compareScored(a, b);
   if (primary !== 0) return primary;
   const usedA = new Set(a.cards.map((c) => c.id));
@@ -177,8 +214,7 @@ export function compareBanks(bankA: GameCard[], bankB: GameCard[]): number {
       suitWeight(restA[i]!.suit) - suitWeight(restB[i]!.suit);
     if (d !== 0) return d;
   }
-  // RULES-GAP: extended-kicker comparison when one bank simply has more cards
-  // left over is unspecified; an extra card beats no card.
+  // Ratified (M2.5 §10): on a prefix tie, an extra card beats no card.
   return restA.length - restB.length;
 }
 
@@ -186,9 +222,11 @@ export function showdown(bank0: GameCard[], bank1: GameCard[]): {
   winner: PlayerId | 'draw';
   hands: [HandResult, HandResult];
 } {
-  const cmp = compareBanks(bank0, bank1);
+  const a = bestHand(bank0);
+  const b = bestHand(bank1);
+  const cmp = compareBanksScored(a, b, bank0, bank1);
   return {
     winner: cmp > 0 ? 0 : cmp < 0 ? 1 : 'draw',
-    hands: [toHandResult(bestHand(bank0)), toHandResult(bestHand(bank1))],
+    hands: [toHandResult(a), toHandResult(b)],
   };
 }

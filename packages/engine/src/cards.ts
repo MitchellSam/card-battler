@@ -53,10 +53,12 @@ export function isSettableSpell(card: GameCard): boolean {
   return isSpellCard(card) && card.rank !== 'JOKER';
 }
 
-/** Numeric value of a number card (Ace = 1). Used for power, sacrifice tiers, Q/K amounts. */
+/**
+ * Numeric value of a number card (Ace = 1). Used for power and sacrifice tiers.
+ * As Q/K discard fuel an Ace is 1 or 11 at the caster's choice (M2.5 §4) — the
+ * reducer handles that path; this base value never applies there.
+ */
 export function numberValue(rank: Rank): number {
-  // RULES-GAP: Q/K say "discard a number card ... that value". Ace's value as a
-  // discard is unstated; the flip table treats A as a number card, so we count A = 1.
   if (rank === 'A') return 1;
   const n = Number(rank);
   if (!Number.isFinite(n)) throw new Error(`not a number rank: ${rank}`);
@@ -78,14 +80,13 @@ export function sacrificeCost(card: GameCard): number {
   return 0;
 }
 
-/** Blackjack value for Polymerization draws (Ace handled separately: caster picks 1 or 11). */
+/**
+ * Blackjack value for Polymerization (Ace handled separately: caster picks 1 or
+ * 11; Jokers never score — a drawn Joker is shuffled back and redrawn, M2.5 §7).
+ */
 export function polyValue(rank: Rank): number {
   if (rank === 'J' || rank === 'Q' || rank === 'K') return 10;
-  if (rank === 'JOKER') {
-    // RULES-GAP: a Joker drawn during Polymerization has no defined blackjack value.
-    // Conservative reading: 0 (it is neither a number nor a face card).
-    return 0;
-  }
+  if (rank === 'JOKER') throw new Error('Jokers have no Poly value (reshuffled on draw)');
   return numberValue(rank);
 }
 
@@ -107,9 +108,12 @@ export function effectiveFlipRank(card: GameCard): Rank {
   throw new Error(`unknown effect id: ${eff}`);
 }
 
-/** Current effective power: temp "becomes" overrides base, then temp adds, floored at 0. */
+/**
+ * Current effective power: temp "becomes" overrides base, then temp adds.
+ * May be ≤ 0 — the reducer destroys such monsters immediately (M2.5 §6), so
+ * no surviving monster ever shows a negative number.
+ */
 export function effectivePower(m: Monster): number {
   const base = m.tempSet ? m.tempSet.value : m.power;
-  const total = base + m.tempAdds.reduce((sum, b) => sum + b.value, 0);
-  return Math.max(0, total);
+  return base + m.tempAdds.reduce((sum, b) => sum + b.value, 0);
 }

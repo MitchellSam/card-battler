@@ -68,7 +68,7 @@ export interface PlayerState {
   spellTraps: (SetSpell | null)[]; // fixed length = config.spellTrapZones
   graveyard: GameCard[]; // public, ordered
   bank: GameCard[]; // public
-  removed: GameCard[]; // RULES-GAP: cards "removed" from a bank (bank-trigger removal, wall-punish) go to a removed-from-game zone, not the graveyard — YGO "remove" convention; grave would let Heart revive them, which seems unintended. Flag-free for M1.
+  removed: GameCard[]; // exiled: bank-removed cards (bank-trigger removal, wall-punish) never re-enter play (ratified M2.5 §12)
   mulliganed: boolean;
 }
 
@@ -131,13 +131,17 @@ export type Pending =
   | { type: 'flipTarget'; player: PlayerId; stackItemId: number; effectRank: '2' | '6' }
   | { type: 'wallPunishPick'; player: PlayerId; attacker: PlayerId }
   | { type: 'polyAce'; player: PlayerId }
-  | { type: 'polyHitStand'; player: PlayerId };
+  | { type: 'polyHitStand'; player: PlayerId }
+  // M2.5 §8: several monsters appeared under a resolving direct attack — the
+  // defender chooses which one intercepts.
+  | { type: 'interceptor'; player: PlayerId; attackerUid: number; attacker: PlayerId };
 
 export interface PolyState {
   caster: PlayerId;
   targetUid: number;
+  /** Starts at the target monster's card value (M2.5 §5), then hits add to it. */
   total: number;
-  dealsRemaining: number; // initial auto-deal counter
+  dealsRemaining: number; // pending hit counter (0 or 1)
   cardIds: string[]; // drawn so far (already moved to caster's graveyard)
 }
 
@@ -150,13 +154,33 @@ export interface RulesConfig {
   wallPunishSelector: 'random' | 'defender' | 'attacker';
   jokersBankable: boolean;
   bankTriggerDeclinable: boolean;
-  deckOutTrigger: 'zeroCards' | 'failedDraw';
   tieBreak: 'extendedKickers';
-  polyInitialDeal: number;
   queenBuffDuration: 'endOfTurn' | 'permanent';
   mirrorCombat: 'mutualDestroy';
   mulliganStyle: 'shuffle' | 'bottom';
   removalFloor: number; // unused in M1 (Run mode only)
+  /** Cards drawn at the start of each turn — ratified at 2 (M2.5 §1). */
+  drawPerTurn: number;
+  /** M2.5 §3: when false, the first player's turn 1 skips the Battle Phase (YGO convention). */
+  firstTurnBattle: boolean;
+  /**
+   * When false (canonical), the first player skips their turn-1 draw phase —
+   * the original first-player compensation. true = experiment knob: turn 1
+   * begins with a normal draw phase (tests whether no-battle-T1 alone is
+   * enough compensation).
+   */
+  firstTurnDraw: boolean;
+  /**
+   * M2.5 §11: cards moved from the top of each shuffled deck to the PUBLIC bank
+   * after mulligans (Jokers shuffled back and replaced). 0 = Constructed canonical.
+   */
+  ante: number;
+  /**
+   * Sim-safety valve AND degeneracy detector: when a turn rollover would push
+   * state.turn past this, the game ends immediately by normal showdown with
+   * result.stalled = true and a GameStalled event.
+   */
+  maxTurns: number;
 }
 
 export const DEFAULT_CONFIG: RulesConfig = {
@@ -168,25 +192,30 @@ export const DEFAULT_CONFIG: RulesConfig = {
   wallPunishSelector: 'random',
   jokersBankable: false,
   bankTriggerDeclinable: true,
-  deckOutTrigger: 'zeroCards',
   tieBreak: 'extendedKickers',
-  polyInitialDeal: 2,
   queenBuffDuration: 'endOfTurn',
   mirrorCombat: 'mutualDestroy',
   mulliganStyle: 'shuffle',
   removalFloor: 40,
+  drawPerTurn: 2,
+  firstTurnBattle: false,
+  firstTurnDraw: false,
+  ante: 0,
+  maxTurns: 300,
 };
 
 export interface HandResult {
-  /** -1 = partial (<5 cards); 0..8 = high card .. straight flush */
+  /** 0..8 = high card .. straight flush (partial banks score real categories too, M2.5 §10) */
   category: number;
   name: string;
-  cards: GameCard[]; // the best 5 (or all, if partial), sorted desc
+  cards: GameCard[]; // the best 5 (or all, if fewer), sorted desc
 }
 
 export interface GameResult {
   winner: PlayerId | 'draw';
   hands: [HandResult, HandResult];
+  /** true when the game was cut off by config.maxTurns instead of deck-out. */
+  stalled: boolean;
 }
 
 export interface GameState {
@@ -205,7 +234,6 @@ export interface GameState {
   normalSummonUsed: boolean;
   nextUid: number;
   nextStackId: number;
-  deckOut: boolean; // a deck hit 0; game ends once stack/pendings fully resolve
   result: GameResult | null;
 }
 
@@ -237,6 +265,8 @@ export type Action =
       graveTarget?: { player: PlayerId; cardId: string };
       summonPosition?: 'attack' | 'defense';
       discardHandIndex?: number;
+      /** M2.5 §4: required iff the Q/K discard is an Ace — caster picks its value. */
+      aceValue?: 1 | 11;
     }
   | { type: 'castJoker'; player: PlayerId; handIndex: number }
   | {
@@ -257,6 +287,7 @@ export type Action =
       bankIndex?: number;
     }
   | { type: 'chooseFlipTarget'; player: PlayerId; monsterUid: number }
+  | { type: 'chooseInterceptor'; player: PlayerId; monsterUid: number }
   | { type: 'wallPunishPick'; player: PlayerId; bankIndex: number }
   | { type: 'polyHit'; player: PlayerId }
   | { type: 'polyStand'; player: PlayerId }
@@ -306,9 +337,12 @@ export interface GameEvent {
     | 'PowerChanged'
     | 'PolyStarted'
     | 'PolyCardDrawn'
+    | 'PolyJokerReshuffled'
     | 'PolyBust'
     | 'PolyStand'
+    | 'AttackIntercepted'
     | 'DeckOut'
+    | 'GameStalled'
     | 'GameEnded';
   [key: string]: unknown;
 }

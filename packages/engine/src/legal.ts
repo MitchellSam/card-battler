@@ -36,6 +36,11 @@ function negatableStackItems(s: GameState): StackItem[] {
   return s.stack.filter((i) => i.kind === 'spell' || i.kind === 'joker' || i.kind === 'flip');
 }
 
+/** M2.5 §4: an Ace discarded as Q/K fuel is 1 or 11, chosen at cast time. */
+function aceValueOptions(card: GameCard): (1 | 11 | undefined)[] {
+  return card.rank === 'A' ? [1, 11] : [undefined];
+}
+
 function suitEffectOf(suit: Suit): 'negate' | 'revive' | 'snipe' | 'poly' {
   switch (suit) {
     case '♠':
@@ -80,26 +85,30 @@ function castOptions(
     case 'Q':
       for (const t of ownFaceUp)
         for (const d of numberDiscards)
-          acts.push({
-            type: 'castSpell',
-            player,
-            source,
-            mode: 'rank',
-            targetMonsterUid: t.m.uid,
-            discardHandIndex: d.i,
-          });
+          for (const aceValue of aceValueOptions(d.c))
+            acts.push({
+              type: 'castSpell',
+              player,
+              source,
+              mode: 'rank',
+              targetMonsterUid: t.m.uid,
+              discardHandIndex: d.i,
+              ...(aceValue !== undefined ? { aceValue } : {}),
+            });
       break;
     case 'K':
       for (const t of oppFaceUp)
         for (const d of numberDiscards)
-          acts.push({
-            type: 'castSpell',
-            player,
-            source,
-            mode: 'rank',
-            targetMonsterUid: t.m.uid,
-            discardHandIndex: d.i,
-          });
+          for (const aceValue of aceValueOptions(d.c))
+            acts.push({
+              type: 'castSpell',
+              player,
+              source,
+              mode: 'rank',
+              targetMonsterUid: t.m.uid,
+              discardHandIndex: d.i,
+              ...(aceValue !== undefined ? { aceValue } : {}),
+            });
       break;
   }
 
@@ -292,6 +301,11 @@ export function legalActions(s: GameState, player: PlayerId): Action[] {
       case 'flipTarget':
         for (const t of fieldMonsters(s))
           acts.push({ type: 'chooseFlipTarget', player, monsterUid: t.m.uid });
+        break;
+      case 'interceptor':
+        // M2.5 §8: defender picks which of its monsters intercepts the direct attack.
+        for (const m of s.players[player].monsters)
+          if (m) acts.push({ type: 'chooseInterceptor', player, monsterUid: m.uid });
         break;
       case 'wallPunishPick':
         s.players[pending.attacker].bank.forEach((_, bankIndex) =>

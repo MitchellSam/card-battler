@@ -29,16 +29,35 @@ describe('hand categories', () => {
 });
 
 describe('bank comparison', () => {
-  it('any complete hand beats any partial hand', () => {
-    const partial = [c('A', '♠'), c('A', '♥'), c('A', '♣'), c('A', '♦')]; // 4 aces, but only 4 cards
+  // M2.5 §10: partial banks score standard categories over the cards available
+  // and compete on the same category scale as complete hands.
+  it('partial banks score real categories: 4 partial aces (quads) beat a complete high card', () => {
+    const partial = [c('A', '♠'), c('A', '♥'), c('A', '♣'), c('A', '♦')];
     const complete = [c('2', '♠'), c('3', '♥'), c('5', '♣'), c('7', '♦'), c('9', '♠')];
-    expect(compareBanks(complete, partial)).toBeGreaterThan(0);
+    expect(bestHand(partial).category).toBe(7);
+    expect(compareBanks(partial, complete)).toBeGreaterThan(0);
   });
 
-  it('partials compare by high card', () => {
+  it('a 2-card KK pair beats a 4-card ace-high (the §10 canonical case)', () => {
+    const pairOfKings = [c('K', '♠'), c('K', '♥')];
+    const aceHigh = [c('A', '♠'), c('9', '♥'), c('7', '♣'), c('3', '♦')];
+    expect(compareBanks(pairOfKings, aceHigh)).toBeGreaterThan(0);
+  });
+
+  it('partial categories: pair beats high card; two pair and trips valid at 4 cards', () => {
     const kHigh = [c('K', '♠')];
     const pairOfFives = [c('5', '♥'), c('5', '♦')];
-    expect(compareBanks(kHigh, pairOfFives)).toBeGreaterThan(0);
+    expect(compareBanks(pairOfFives, kHigh)).toBeGreaterThan(0); // pair > high card
+    expect(bestHand([c('5', '♥'), c('5', '♦'), c('9', '♠'), c('9', '♥')]).category).toBe(2);
+    expect(bestHand([c('5', '♥'), c('5', '♦'), c('5', '♠'), c('9', '♥')]).category).toBe(3);
+    // straights/flushes need 5 cards: 4 same-suit cards are just high card
+    expect(bestHand([c('2', '♠'), c('5', '♠'), c('9', '♠'), c('K', '♠')]).category).toBe(0);
+  });
+
+  it('equal-category partials fall to kickers, then an extra card beats no card', () => {
+    const pairPlusKicker = [c('5', '♥'), c('5', '♦'), c('K', '♠')];
+    const barePair = [c('5', '♠', 1), c('5', '♣', 1)];
+    expect(compareBanks(pairPlusKicker, barePair)).toBeGreaterThan(0);
   });
 
   it('picks the best 5 out of a larger bank', () => {
@@ -116,6 +135,33 @@ describe('property: evaluator vs reference', () => {
         shuffle(bank, rng);
         expect(best).toBeGreaterThanOrEqual(evaluate5(bank.slice(0, 5)).category);
       }
+    }
+  });
+
+  it('agrees on 2000 random PARTIAL hands (1-4 cards, M2.5 §10)', () => {
+    // Reference for partials: count-based categories only; straights/flushes
+    // /full houses require 5 cards and are impossible.
+    const referencePartial = (cards: GameCard[]): number => {
+      const order: Record<string, number> = { A: 14, K: 13, Q: 12, J: 11 };
+      const counts = Object.values(
+        cards
+          .map((x) => order[x.rank] ?? Number(x.rank))
+          .reduce<Record<number, number>>((m, r) => ((m[r] = (m[r] ?? 0) + 1), m), {}),
+      ).sort((a, b) => b - a);
+      if (counts[0] === 4) return 7;
+      if (counts[0] === 3) return 3;
+      if (counts[0] === 2 && counts[1] === 2) return 2;
+      if (counts[0] === 2) return 1;
+      return 0;
+    };
+    const rng = createRng(4321);
+    const deck = [...createDeck(0), ...createDeck(1)].filter((x) => x.rank !== 'JOKER');
+    for (let i = 0; i < 2000; i++) {
+      shuffle(deck, rng);
+      const bank = deck.slice(0, 1 + rng.int(4)); // 1-4 cards, pairs possible across decks
+      expect(bestHand(bank).category, bank.map((h) => h.id).join(',')).toBe(
+        referencePartial(bank),
+      );
     }
   });
 
