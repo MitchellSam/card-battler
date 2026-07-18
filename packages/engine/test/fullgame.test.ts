@@ -76,12 +76,15 @@ describe('full scripted game (acceptance)', () => {
   it('plays 35 turns: every flip effect, both bank choices, poly stand+bust, wall-punish, negate, deck-out, tie-break', () => {
     const rng = createRng(2025);
     // The script was authored under M1 pacing; pin the legacy knobs the story
-    // depends on. Game-end semantics, Poly, partial-hand scoring etc. are the
-    // ratified M2.5 rules and ARE exercised below.
+    // depends on — including bankTriggerScaling 'off' (one card per trigger),
+    // since the scripted bank sequence and final showdown predate the ratified
+    // 'margin' default. Scaling has its own coverage in bank-scaling.test.ts.
+    // Game-end semantics, Poly, partial-hand scoring etc. are the ratified M2.5
+    // rules and ARE exercised below.
     let s = setupGame(rng, {
       decks: [P0_DECK, P1_DECK],
       firstPlayer: 0,
-      config: { drawPerTurn: 1, firstTurnBattle: true },
+      config: { drawPerTurn: 1, firstTurnBattle: true, bankTriggerScaling: 'off' },
     }).state;
     const events: GameEvent[] = [];
     const step = (a: Action) => {
@@ -93,6 +96,9 @@ describe('full scripted game (acceptance)', () => {
     const pass = (p: PlayerId) => step({ type: 'pass', player: p });
     const next = (p: PlayerId) => step({ type: 'nextPhase', player: p });
     const idle = (p: PlayerId) => { next(p); next(p); next(p); };
+    // Ratified (2026-07): flip effects are declinable — activate each one to
+    // put its trigger on the stack (9/10 have no effect and offer no decision).
+    const activate = (p: PlayerId) => step({ type: 'flipChoice', player: p, choice: 'activate' });
 
     step({ type: 'mulligan', player: 0, discardHandIndices: [] });
     step({ type: 'mulligan', player: 1, discardHandIndices: [] });
@@ -126,6 +132,7 @@ describe('full scripted game (acceptance)', () => {
     next(0);
     step({ type: 'declareAttack', player: 0, attackerZone: 0, targetZone: 0 });
     pass(0); pass(1); // 2♥ flips: [flip 2 ✓]
+    activate(1); // p1 uses the 2's position-flip
     step({ type: 'chooseFlipTarget', player: 1, monsterUid: 3 }); // flip the attacker's position
     pass(0); pass(1); // 7♠ → defense
     pass(0); pass(1); // combat fizzles
@@ -170,6 +177,7 @@ describe('full scripted game (acceptance)', () => {
     });
     pass(0); pass(1);
     step({ type: 'flipMonster', player: 0, zoneIndex: 1 });
+    activate(0); // flip A♠ → 11
     pass(0); pass(1);
     expect(effectivePower(s.players[0].monsters[1]!)).toBe(11);
     next(0);
@@ -182,7 +190,8 @@ describe('full scripted game (acceptance)', () => {
     pass(0); pass(1);
     expect(s.pending).toBeNull(); // defense kill: no bank trigger
     step({ type: 'declareAttack', player: 0, attackerZone: 0, targetZone: 1 }); // 7♠(9) into set 4♥
-    pass(0); pass(1); // flip 4 stacks
+    pass(0); pass(1); // attack resolves; the 4♥ flips
+    activate(1); // p1 uses the 4's draw → [flip 4 ✓]
     pass(0); pass(1); // resolves: p1 draws K♥
     pass(0); pass(1); // combat: 9 > 4
     expect(s.players[1].hand.map((x) => x.id)).toContain('1:K♥');
@@ -196,7 +205,8 @@ describe('full scripted game (acceptance)', () => {
     step({ type: 'summon', player: 0, handIndex: 0, zoneIndex: 1, mode: 'set', sacrificeZoneIndices: [1] });
     next(0);
     step({ type: 'declareAttack', player: 0, attackerZone: 0, targetZone: 0 });
-    pass(0); pass(1); // flip 3 stacks
+    pass(0); pass(1); // attack resolves; the 3♥ flips
+    activate(1); // p1 uses the 3's reveal → [flip 3 ✓]
     pass(0); pass(1); // reveal resolves
     pass(0); pass(1); // combat: 9 > 3
     expect(events.some((e) => e.type === 'HandRevealed')).toBe(true);
@@ -207,7 +217,8 @@ describe('full scripted game (acceptance)', () => {
     step({ type: 'summon', player: 1, handIndex: 3, zoneIndex: 0, mode: 'attack' });
     next(1);
     step({ type: 'declareAttack', player: 1, attackerZone: 0, targetZone: 1 });
-    pass(1); pass(0); // flip 5 stacks
+    pass(1); pass(0); // attack resolves; the 5♣ flips
+    activate(0); // p0 uses the 5's mill → [flip 5 ✓]
     pass(1); pass(0); // mill 2 resolves
     pass(1); pass(0); // combat: 4 < 5
     expect(s.players[1].graveyard.map((x) => x.id)).toEqual(
@@ -243,6 +254,7 @@ describe('full scripted game (acceptance)', () => {
     // T15 (p0): manual flip 7♦ → [flip 7 ✓] random discard eats p1's K♥ (seed 2025);
     // 7♦ kills A♥ → bank 10♠
     step({ type: 'flipMonster', player: 0, zoneIndex: 1 });
+    activate(0); // 7♦ flip → random discard [flip 7 ✓]
     pass(0); pass(1);
     expect(s.players[1].graveyard.map((x) => x.id)).toContain('1:K♥');
     expect(s.players[1].hand.map((x) => x.id)).toEqual(['1:9♦', '1:8♦', '1:10♣']);
@@ -284,7 +296,8 @@ describe('full scripted game (acceptance)', () => {
     // fizzles; main 2: sac 2♠+3♣ → SET 8♣ [uid18]
     next(0);
     step({ type: 'declareAttack', player: 0, attackerZone: 1, targetZone: 0 });
-    pass(0); pass(1);
+    pass(0); pass(1); // attack resolves; the 6♥ flips
+    activate(1); // p1 uses the 6's bounce → [flip 6 ✓]
     step({ type: 'chooseFlipTarget', player: 1, monsterUid: 12 }); // bounce 7♦
     pass(0); pass(1); // bounce resolves
     pass(0); pass(1); // combat fizzles
@@ -299,7 +312,8 @@ describe('full scripted game (acceptance)', () => {
     step({ type: 'changePosition', player: 1, zoneIndex: 0 });
     next(1);
     step({ type: 'declareAttack', player: 1, attackerZone: 0, targetZone: 1 });
-    pass(1); pass(0); // flip 8 stacks
+    pass(1); pass(0); // attack resolves; the 8♣ flips
+    activate(0); // p0 uses the 8's board wipe → [flip 8 ✓]
     pass(1); pass(0); // board wipe resolves
     pass(1); pass(0); // combat fizzles (attacker died to its own trigger)
     expect(s.players[1].monsters.every((m) => m === null)).toBe(true);

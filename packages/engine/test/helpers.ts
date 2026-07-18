@@ -140,18 +140,38 @@ export function run(state: GameState, rng: SeededRNG, ...actions: Action[]): Run
   return { state: s, events };
 }
 
-/** Pass with whichever player holds priority until the stack fully resolves (or a decision interrupts). */
+/**
+ * Pass with whichever player holds priority until the stack fully resolves (or
+ * a decision interrupts). Auto-activates declinable flip triggers (ratified
+ * 2026-07) so tests exercising a flip's effect read as "the flip resolves";
+ * a `flipTarget`/other pending still halts for the test to answer.
+ */
 export function resolveStack(state: GameState, rng: SeededRNG, maxSteps = 50): RunResult {
   let s = state;
   const events: GameEvent[] = [];
   let steps = 0;
-  while (s.stack.length > 0 && !s.pending && !s.poly && s.phase !== 'gameOver') {
+  while (!s.poly && s.phase !== 'gameOver') {
+    const flipDecision = s.pending?.type === 'flipDecision';
+    if (!flipDecision && (s.stack.length === 0 || s.pending)) break;
     if (steps++ > maxSteps) throw new Error('resolveStack: did not converge');
-    const r = applyAction(s, { type: 'pass', player: s.priority }, rng);
+    const action: Action = flipDecision
+      ? { type: 'flipChoice', player: s.pending!.player, choice: 'activate' }
+      : { type: 'pass', player: s.priority };
+    const r = applyAction(s, action, rng);
     s = r.state;
     events.push(...r.events);
   }
   return { state: s, events };
+}
+
+/** Answer a `flipDecision` pending (test helper for the declinable-flip rule). */
+export function flipChoice(
+  state: GameState,
+  rng: SeededRNG,
+  choice: 'activate' | 'decline',
+): RunResult {
+  if (state.pending?.type !== 'flipDecision') throw new Error('no flip decision pending');
+  return run(state, rng, { type: 'flipChoice', player: state.pending.player, choice });
 }
 
 export const rng0 = (): SeededRNG => createRng(42);

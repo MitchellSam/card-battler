@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { effectivePower } from '../src/cards.js';
+import { legalActions } from '../src/legal.js';
 import { applyAction } from '../src/reducer.js';
-import { card, fillerDeck, makeState, mon, resolveStack, rng0, run, types } from './helpers.js';
+import { card, fillerDeck, flipChoice, makeState, mon, resolveStack, rng0, run, types } from './helpers.js';
 
 describe('flip effects', () => {
   it('manual flip triggers the effect on the stack; A becomes 11 until end of turn', () => {
@@ -11,7 +12,10 @@ describe('flip effects', () => {
     });
     let r = applyAction(s, { type: 'flipMonster', player: 0, zoneIndex: 0 }, rng0());
     expect(r.state.players[0].monsters[0]?.position).toBe('attack');
-    expect(r.state.stack).toHaveLength(1); // respondable trigger
+    // Ratified (2026-07): the flip is offered first, not forced onto the stack.
+    expect(r.state.pending).toMatchObject({ type: 'flipDecision', player: 0, effectRank: 'A' });
+    r = flipChoice(r.state, rng0(), 'activate');
+    expect(r.state.stack).toHaveLength(1); // respondable trigger, now on the stack
     r = resolveStack(r.state, rng0());
     expect(effectivePower(r.state.players[0].monsters[0]!)).toBe(11);
     // reverts at end of the turn it was flipped
@@ -25,11 +29,61 @@ describe('flip effects', () => {
     expect(effectivePower(r.state.players[0].monsters[0]!)).toBe(1);
   });
 
+  it('a manually flipped monster cannot switch position the same turn (ratified 2026-07)', () => {
+    // Rank 9 has no flip effect, isolating the position-lock from the stack.
+    const s = makeState({
+      turn: 5,
+      p0: { monsters: [mon(card(0, '9', '♠'), 'set', 1, { setTurn: 3 })] },
+    });
+    const r = applyAction(s, { type: 'flipMonster', player: 0, zoneIndex: 0 }, rng0());
+    expect(r.state.players[0].monsters[0]?.position).toBe('attack');
+    expect(r.state.stack).toHaveLength(0); // 9 = no effect, no trigger
+    // The flip consumes this turn's position change: neither offered nor allowed.
+    expect(legalActions(r.state, 0).some((a) => a.type === 'changePosition')).toBe(false);
+    expect(() =>
+      applyAction(r.state, { type: 'changePosition', player: 0, zoneIndex: 0 }, rng0()),
+    ).toThrow(/position already changed/);
+  });
+
   it('cannot manually flip the turn the monster was set', () => {
     const s = makeState({ turn: 5, p0: { monsters: [mon(card(0, 'A', '♠'), 'set', 1, { setTurn: 5 })] } });
     expect(() => applyAction(s, { type: 'flipMonster', player: 0, zoneIndex: 0 }, rng0())).toThrow(
       /turn it was set/,
     );
+  });
+
+  it('declining a manual flip skips the effect and returns to the main phase (ratified 2026-07)', () => {
+    const s = makeState({
+      turn: 5,
+      p0: { monsters: [mon(card(0, '4', '♠'), 'set', 1, { setTurn: 3 })], deck: fillerDeck(0, 5) },
+    });
+    let r = applyAction(s, { type: 'flipMonster', player: 0, zoneIndex: 0 }, rng0());
+    expect(r.state.pending).toMatchObject({ type: 'flipDecision', player: 0, effectRank: '4' });
+    r = flipChoice(r.state, rng0(), 'decline');
+    expect(types(r.events)).toContain('FlipDeclined');
+    expect(r.state.stack).toHaveLength(0); // no trigger queued
+    expect(r.state.players[0].hand).toHaveLength(0); // the 4's draw never happened
+    expect(r.state.players[0].monsters[0]?.position).toBe('attack'); // still flipped up
+    expect(r.state.pending).toBeNull();
+    // control is back with the active player mid-main-phase
+    expect(r.state.phase).toBe('main1');
+  });
+
+  it('a defender may decline the flip effect of a monster flipped by an attack', () => {
+    // Attacked set 6 would bounce the attacker; declining lets combat proceed.
+    const s = makeState({
+      phase: 'battle',
+      p0: { monsters: [mon(card(0, '7', '♠'), 'attack', 1)] },
+      p1: { monsters: [mon(card(1, '6', '♦'), 'set', 2)] },
+    });
+    let r = applyAction(s, { type: 'declareAttack', player: 0, attackerZone: 0, targetZone: 0 }, rng0());
+    // both pass; attack resolves, the 6 flips, and its controller is offered the effect
+    r = run(r.state, rng0(), { type: 'pass', player: 0 }, { type: 'pass', player: 1 });
+    expect(r.state.pending).toMatchObject({ type: 'flipDecision', player: 1, effectRank: '6' });
+    r = flipChoice(r.state, rng0(), 'decline'); // don't bounce — take the fight
+    r = resolveStack(r.state, rng0()); // combat resolves: 7 > 6, the 6 is destroyed
+    expect(r.state.players[1].monsters[0]).toBeNull();
+    expect(r.state.players[0].monsters[0]?.card.id).toBe('0:7♠'); // attacker survives
   });
 
   it('4 draws a card; 3 reveals the opponent hand; 7 discards a random opponent card', () => {
@@ -120,6 +174,8 @@ describe('flip effects', () => {
       p1: { monsters: [mon(card(1, '4', '♦'), 'set', 2, { setTurn: 2 })] },
     });
     let r = applyAction(s, { type: 'flipMonster', player: 0, zoneIndex: 0 }, rng0());
+    // Activate the declinable flip; the 2 then asks for its position-flip target.
+    r = flipChoice(r.state, rng0(), 'activate');
     expect(r.state.pending).toMatchObject({ type: 'flipTarget', player: 0 });
     r = applyAction(r.state, { type: 'chooseFlipTarget', player: 0, monsterUid: 2 }, rng0());
     r = resolveStack(r.state, rng0()); // resolves the 2 → flips the set 4 → chains its trigger → draw
@@ -169,6 +225,7 @@ describe('flip effects', () => {
       p1: { spellTraps: [{ card: card(1, 'K', '♠'), setTurn: 4 }] },
     });
     let r = applyAction(s, { type: 'flipMonster', player: 0, zoneIndex: 0 }, rng0());
+    r = flipChoice(r.state, rng0(), 'activate'); // put the flip trigger on the stack
     const flipItemId = r.state.stack[0]!.id;
     r = applyAction(r.state, { type: 'pass', player: 0 }, rng0());
     r = run(

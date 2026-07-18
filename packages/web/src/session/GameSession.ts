@@ -70,6 +70,9 @@ export class GameSession {
   readonly events: GameEvent[] = [];
   readonly actionLog: Action[] = [];
 
+  /** uid → card face ("7♠") once that monster's identity is public to the human. */
+  private readonly uidFace = new Map<number, string>();
+
   /** Monotonic change counter for useSyncExternalStore snapshots. */
   version = 0;
   /** true while an auto-pass timer is pending — UI pulses the priority marker. */
@@ -215,12 +218,31 @@ export class GameSession {
 
   // --- internals -----------------------------------------------------------
 
+  /** Human-readable card face for a monster uid, if its identity is public. */
+  uidName(uid: number): string | null {
+    return this.uidFace.get(uid) ?? null;
+  }
+
   private apply(action: Action): void {
     const r = applyAction(this.state, action, this.engineRng);
     this.state = r.state;
     this.events.push(...r.events);
     this.actionLog.push(action);
+    this.recordIdentities(r.events);
     this.version++;
+  }
+
+  /** Track uid→face for events that reveal a monster's identity to the human. */
+  private recordIdentities(events: GameEvent[]): void {
+    for (const e of events) {
+      const uid = e.uid as number | undefined;
+      const cardId = e.cardId as string | undefined;
+      if (uid === undefined || cardId === undefined) continue;
+      // A face-down set is public only if it is the human's own.
+      if (e.type === 'MonsterSet' && e.player !== HUMAN) continue;
+      const face = cardId.slice(cardId.indexOf(':') + 1);
+      this.uidFace.set(uid, face.startsWith('JOKER') ? 'Joker' : face);
+    }
   }
 
   /**

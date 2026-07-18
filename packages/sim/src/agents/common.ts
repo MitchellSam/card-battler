@@ -236,6 +236,10 @@ export function defaultPendingChoice(
       }
       return best;
     }
+    case 'flipDecision':
+      // Heuristic agents always activate — preserves the pre-ratification
+      // "flip always resolves" behaviour so sim baselines stay comparable.
+      return ofType(legal, 'flipChoice').find((a) => a.choice === 'activate') ?? legal[0]!;
     case 'flipTarget': {
       // 2 (position-flip) / 6 (bounce): hit the opponent's biggest face-up
       // monster; fall back to anything.

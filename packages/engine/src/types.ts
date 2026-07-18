@@ -127,7 +127,12 @@ export type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T,
 
 export type Pending =
   | { type: 'discard'; player: PlayerId } // end-phase discard to hand limit, one card at a time
-  | { type: 'bankTrigger'; player: PlayerId }
+  // remaining = how many bank/remove choices this trigger still grants
+  // (>1 only under config.bankTriggerScaling; the base rule always awards 1).
+  | { type: 'bankTrigger'; player: PlayerId; remaining: number }
+  // Ratified (2026-07): a triggering flip effect is declinable — the monster's
+  // controller chooses to activate or skip it before it reaches the stack.
+  | { type: 'flipDecision'; player: PlayerId; sourceUid: number; effectRank: Rank }
   | { type: 'flipTarget'; player: PlayerId; stackItemId: number; effectRank: '2' | '6' }
   | { type: 'wallPunishPick'; player: PlayerId; attacker: PlayerId }
   | { type: 'polyAce'; player: PlayerId }
@@ -154,6 +159,15 @@ export interface RulesConfig {
   wallPunishSelector: 'random' | 'defender' | 'attacker';
   jokersBankable: boolean;
   bankTriggerDeclinable: boolean;
+  /**
+   * Ratified 2026-07 ('margin' is the canonical default): scale a combat bank
+   * trigger by EFFECTIVE POWER at trigger time (banded 1-4 → 1 card, 5-7 → 2,
+   * 8+ → 3). 'margin' (base rule) = YGO-style — a direct hit lands full attacker
+   * power, a combat kill scales by how much the winner's power exceeded the
+   * loser's. 'power' = the winning monster's own power (an Ace pumped to 11
+   * scores 3). 'off' = the pre-ratification flat rule (always 1 card).
+   */
+  bankTriggerScaling: 'off' | 'power' | 'margin';
   tieBreak: 'extendedKickers';
   queenBuffDuration: 'endOfTurn' | 'permanent';
   mirrorCombat: 'mutualDestroy';
@@ -192,6 +206,7 @@ export const DEFAULT_CONFIG: RulesConfig = {
   wallPunishSelector: 'random',
   jokersBankable: false,
   bankTriggerDeclinable: true,
+  bankTriggerScaling: 'margin',
   tieBreak: 'extendedKickers',
   queenBuffDuration: 'endOfTurn',
   mirrorCombat: 'mutualDestroy',
@@ -286,6 +301,7 @@ export type Action =
       handIndex?: number;
       bankIndex?: number;
     }
+  | { type: 'flipChoice'; player: PlayerId; choice: 'activate' | 'decline' }
   | { type: 'chooseFlipTarget'; player: PlayerId; monsterUid: number }
   | { type: 'chooseInterceptor'; player: PlayerId; monsterUid: number }
   | { type: 'wallPunishPick'; player: PlayerId; bankIndex: number }
@@ -321,6 +337,7 @@ export interface GameEvent {
     | 'AttackDeclared'
     | 'MonsterFlipped'
     | 'FlipTriggered'
+    | 'FlipDeclined'
     | 'PositionChanged'
     | 'CombatResolved'
     | 'MonsterDestroyed'

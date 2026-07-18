@@ -99,6 +99,9 @@ describe('serialization', () => {
       { type: 'declareAttack', player: 0, attackerZone: 0, targetZone: 0 },
       { type: 'pass', player: 0 },
       { type: 'pass', player: 1 },
+      // Ratified (2026-07): the attacked 2's flip is offered first; activate it
+      // to reach the flipTarget decision this round-trips.
+      { type: 'flipChoice', player: 1, choice: 'activate' },
     ).state;
     expect(r.pending?.type).toBe('flipTarget');
     expect(r.stack.length).toBeGreaterThan(0);

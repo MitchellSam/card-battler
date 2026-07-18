@@ -206,17 +206,62 @@ function queueFlipTrigger(ctx: Ctx, loc: MonsterLoc): void {
   }
 }
 
-function awardBankTrigger(ctx: Ctx, winner: PlayerId): void {
+/**
+ * Ratified (2026-07): flip effects are declinable. When a monster flips
+ * face-up, its controller is offered the trigger rather than having it forced
+ * onto the stack. Ranks 9/10 have no effect, so there is nothing to decline —
+ * they resolve to no pending, exactly as before.
+ */
+function offerFlip(ctx: Ctx, loc: MonsterLoc): void {
+  const rank = effectiveFlipRank(loc.m.card);
+  if (rank === '9' || rank === '10') return;
+  ctx.s.pending = {
+    type: 'flipDecision',
+    player: loc.player,
+    sourceUid: loc.m.uid,
+    effectRank: rank,
+  };
+}
+
+/** Whether a bank trigger for `player` has any bank-or-remove option available. */
+function bankTriggerHasOption(s: GameState, player: PlayerId): boolean {
+  const bankable = s.players[player].hand.some((c) => c.rank !== 'JOKER' || s.config.jokersBankable);
+  const removable = s.players[other(player)].bank.length > 0;
+  return bankable || removable;
+}
+
+/** Band effective power to a bank-trigger card count: 1-4 → 1, 5-7 → 2, 8+ → 3. */
+function powerToCards(power: number): number {
+  if (power >= 8) return 3;
+  if (power >= 5) return 2;
+  return 1; // includes ≤0 (e.g. a suit-tiebreak win has a 0 power margin)
+}
+
+/**
+ * How many bank/remove choices a combat trigger grants. Base rule = 1; the
+ * bankTriggerScaling knob (2026-07 experiment) bands EFFECTIVE POWER at trigger
+ * time. 'power' uses the winner's own power; 'margin' uses the winner-minus-
+ * loser difference (winnerPower alone on a direct hit, where there is no loser).
+ */
+function bankTriggerCards(s: GameState, winnerPower: number, loserPower?: number): number {
+  switch (s.config.bankTriggerScaling) {
+    case 'power':
+      return powerToCards(winnerPower);
+    case 'margin':
+      return powerToCards(loserPower === undefined ? winnerPower : winnerPower - loserPower);
+    default:
+      return 1;
+  }
+}
+
+function awardBankTrigger(ctx: Ctx, winner: PlayerId, count = 1): void {
   const { s, events } = ctx;
-  const hand = s.players[winner].hand;
-  const bankable = hand.some((c) => c.rank !== 'JOKER' || s.config.jokersBankable);
-  const removable = s.players[other(winner)].bank.length > 0;
-  if (!bankable && !removable) {
+  if (!bankTriggerHasOption(s, winner)) {
     events.push({ type: 'BankTriggerSkipped', player: winner });
     return;
   }
-  s.pending = { type: 'bankTrigger', player: winner };
-  events.push({ type: 'BankTriggerAwarded', player: winner });
+  s.pending = { type: 'bankTrigger', player: winner, remaining: Math.max(1, count) };
+  events.push({ type: 'BankTriggerAwarded', player: winner, count: Math.max(1, count) });
 }
 
 function removeBankCard(ctx: Ctx, bankOwner: PlayerId, bankIndex: number, reason: string): void {
@@ -546,7 +591,7 @@ function resolveFlip(ctx: Ctx, item: Extract<StackItem, { kind: 'flip' }>): void
           cardId: tloc.m.card.id,
           by: 'effect',
         });
-        queueFlipTrigger(ctx, tloc);
+        offerFlip(ctx, tloc);
       } else {
         tloc.m.position = tloc.m.position === 'attack' ? 'defense' : 'attack';
         events.push({
@@ -627,7 +672,7 @@ function resolveAttack(ctx: Ctx, item: Extract<StackItem, { kind: 'attack' }>): 
     const interceptors = s.players[defender].monsters.filter((m) => m !== null);
     if (interceptors.length === 0) {
       events.push({ type: 'CombatResolved', direct: true, attacker: item.controller });
-      awardBankTrigger(ctx, item.controller);
+      awardBankTrigger(ctx, item.controller, bankTriggerCards(s, effectivePower(aloc.m)));
       return;
     }
     // M2.5 §8: monsters that appeared under a direct attack intercept it.
@@ -672,7 +717,7 @@ function attackMonster(ctx: Ctx, attackingPlayer: PlayerId, attackerUid: number,
       attackerUid,
       targetUid: tloc.m.uid,
     });
-    queueFlipTrigger(ctx, tloc);
+    offerFlip(ctx, tloc);
     return;
   }
   resolveCombat(ctx, attackerUid, tloc.m.uid);
@@ -727,11 +772,13 @@ function resolveCombat(ctx: Ctx, attackerUid: number, targetUid: number): void {
   }
   if (defenderPosition === 'attack') {
     if (cmp > 0) {
+      const count = bankTriggerCards(s, ap, dp); // attacker won by (ap − dp)
       destroyMonster(ctx, tloc);
-      awardBankTrigger(ctx, aloc.player);
+      awardBankTrigger(ctx, aloc.player, count);
     } else {
+      const count = bankTriggerCards(s, dp, ap); // defender won by (dp − ap)
       destroyMonster(ctx, aloc);
-      awardBankTrigger(ctx, tloc.player); // winner of an attack-vs-attack fight gets the choice regardless of who declared
+      awardBankTrigger(ctx, tloc.player, count); // winner of an attack-vs-attack fight gets the choice regardless of who declared
     }
     return;
   }
@@ -980,6 +1027,9 @@ function handleFlipMonster(ctx: Ctx, action: Extract<Action, { type: 'flipMonste
   // position-change limit, but never the turn it was set.
   if ((m.setTurn ?? 0) >= s.turn) fail('cannot flip the turn it was set', action);
   m.position = 'attack';
+  // Ratified (2026-07): a monster flipped face-up cannot switch to defense the
+  // same turn — the manual flip consumes this turn's position change.
+  m.posChangedTurn = s.turn;
   events.push({
     type: 'MonsterFlipped',
     player: action.player,
@@ -987,9 +1037,10 @@ function handleFlipMonster(ctx: Ctx, action: Extract<Action, { type: 'flipMonste
     cardId: m.card.id,
     by: 'manual',
   });
-  queueFlipTrigger(ctx, { player: action.player, zone: action.zoneIndex, m });
+  // Declinable: offer the flip to the controller (no-op stack-wise for 9/10).
+  offerFlip(ctx, { player: action.player, zone: action.zoneIndex, m });
   s.passes = 0;
-  s.priority = action.player; // controller retains priority over their own trigger
+  s.priority = action.player; // controller keeps priority for the decision / trigger
 }
 
 function handleChangePosition(ctx: Ctx, action: Extract<Action, { type: 'changePosition' }>): void {
@@ -1252,6 +1303,7 @@ function handleBankChoice(ctx: Ctx, action: Extract<Action, { type: 'bankChoice'
   const { s, events } = ctx;
   if (s.pending?.type !== 'bankTrigger' || s.pending.player !== action.player)
     fail('no bank trigger pending for you', action);
+  const pending = s.pending;
   const ps = s.players[action.player];
   switch (action.choice) {
     case 'bank': {
@@ -1271,11 +1323,38 @@ function handleBankChoice(ctx: Ctx, action: Extract<Action, { type: 'bankChoice'
     }
     case 'decline':
       if (!s.config.bankTriggerDeclinable) fail('bank trigger cannot be declined', action);
+      // Declining forfeits the whole trigger, including any scaled remainder.
       events.push({ type: 'BankTriggerDeclined', player: action.player });
-      break;
+      s.pending = null;
+      resumeFlow(ctx);
+      return;
+  }
+  // A bank/remove consumes one grant; a scaled trigger may still owe more.
+  const remaining = pending.remaining - 1;
+  if (remaining > 0 && bankTriggerHasOption(s, action.player)) {
+    s.pending = { type: 'bankTrigger', player: action.player, remaining };
+    return;
   }
   s.pending = null;
   resumeFlow(ctx);
+}
+
+function handleFlipChoice(ctx: Ctx, action: Extract<Action, { type: 'flipChoice' }>): void {
+  const { s, events } = ctx;
+  if (s.pending?.type !== 'flipDecision' || s.pending.player !== action.player)
+    fail('no flip decision pending for you', action);
+  const { sourceUid } = s.pending;
+  s.pending = null;
+  if (action.choice === 'decline') {
+    events.push({ type: 'FlipDeclined', player: action.player, uid: sourceUid });
+    resumeFlow(ctx);
+    return;
+  }
+  // Activate: put the trigger on the stack now (queueFlipTrigger sets the
+  // flipTarget pending itself for 2/6, in which case we must not resume yet).
+  const loc = findMonster(s, sourceUid);
+  if (loc) queueFlipTrigger(ctx, loc);
+  if (!s.pending) resumeFlow(ctx);
 }
 
 function handleChooseFlipTarget(ctx: Ctx, action: Extract<Action, { type: 'chooseFlipTarget' }>): void {
@@ -1393,6 +1472,9 @@ export function applyAction(
       break;
     case 'bankChoice':
       handleBankChoice(ctx, action);
+      break;
+    case 'flipChoice':
+      handleFlipChoice(ctx, action);
       break;
     case 'chooseFlipTarget':
       handleChooseFlipTarget(ctx, action);

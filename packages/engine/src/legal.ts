@@ -298,6 +298,10 @@ export function legalActions(s: GameState, player: PlayerId): Action[] {
           acts.push({ type: 'bankChoice', player, choice: 'decline' });
         break;
       }
+      case 'flipDecision':
+        acts.push({ type: 'flipChoice', player, choice: 'activate' });
+        acts.push({ type: 'flipChoice', player, choice: 'decline' });
+        break;
       case 'flipTarget':
         for (const t of fieldMonsters(s))
           acts.push({ type: 'chooseFlipTarget', player, monsterUid: t.m.uid });

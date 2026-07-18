@@ -18,7 +18,7 @@ describe('combat', () => {
     r = resolveStack(r.state, rng0());
     expect(r.state.players[1].monsters[0]).toBeNull();
     expect(r.state.players[1].graveyard.map((c) => c.id)).toContain('1:5♦');
-    expect(r.state.pending).toEqual({ type: 'bankTrigger', player: 0 });
+    expect(r.state.pending).toEqual({ type: 'bankTrigger', player: 0, remaining: 1 });
     // bank the K from hand
     const r2 = applyAction(r.state, { type: 'bankChoice', player: 0, choice: 'bank', handIndex: 0 }, rng0());
     expect(r2.state.players[0].bank.map((c) => c.id)).toEqual(['0:K♥']);
@@ -33,7 +33,8 @@ describe('combat', () => {
     let r = applyAction(s, { type: 'declareAttack', player: 0, attackerZone: 0, targetZone: 0 }, rng0());
     r = resolveStack(r.state, rng0());
     expect(r.state.players[0].monsters[0]).toBeNull();
-    expect(r.state.pending).toEqual({ type: 'bankTrigger', player: 1 });
+    // margin default: defender 9 beat attacker 3 by 6 → 2 grants (only 1 spent below).
+    expect(r.state.pending).toEqual({ type: 'bankTrigger', player: 1, remaining: 2 });
     // defender chooses to remove from the attacker's bank instead of banking
     const r2 = applyAction(r.state, { type: 'bankChoice', player: 1, choice: 'remove', bankIndex: 0 }, rng0());
     expect(r2.state.players[0].bank).toHaveLength(0);
@@ -49,7 +50,7 @@ describe('combat', () => {
     r = resolveStack(r.state, rng0());
     expect(r.state.players[0].monsters[0]).not.toBeNull(); // spade survives
     expect(r.state.players[1].monsters[0]).toBeNull();
-    expect(r.state.pending).toEqual({ type: 'bankTrigger', player: 0 });
+    expect(r.state.pending).toEqual({ type: 'bankTrigger', player: 0, remaining: 1 });
   });
 
   it('true mirror (same rank and suit): both destroyed, no bank trigger', () => {
@@ -132,7 +133,8 @@ describe('combat', () => {
     });
     let r = applyAction(open, { type: 'declareAttack', player: 0, attackerZone: 0, direct: true }, rng0());
     r = resolveStack(r.state, rng0());
-    expect(r.state.pending).toEqual({ type: 'bankTrigger', player: 0 });
+    // margin default: a direct hit lands full attacker power (7 → 2 grants).
+    expect(r.state.pending).toEqual({ type: 'bankTrigger', player: 0, remaining: 2 });
   });
 
   it('attacking a set monster flips it; survivor stays face-up defense', () => {
@@ -179,7 +181,8 @@ describe('combat', () => {
     });
     let r = applyAction(s, { type: 'declareAttack', player: 0, attackerZone: 0, direct: true }, rng0());
     r = resolveStack(r.state, rng0());
-    expect(r.state.pending).toEqual({ type: 'bankTrigger', player: 0 });
+    // margin default: direct hit at power 7 → 2 grants.
+    expect(r.state.pending).toEqual({ type: 'bankTrigger', player: 0, remaining: 2 });
     expect(() =>
       applyAction(r.state, { type: 'bankChoice', player: 0, choice: 'bank', handIndex: 0 }, rng0()),
     ).toThrow(/Joker/);

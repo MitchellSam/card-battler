@@ -31,7 +31,11 @@ npm workspaces, no monorepo tooling.
   comes from the sim's `actorFor`, and components render only from
   `viewFor(state, HUMAN)` + the event log. `GameSession` (plain TS, headless-
   tested) owns the full state, RNGs, logs, AI pacing, auto-pass, decision-time
-  instrumentation, and deterministic replay export.
+  instrumentation, and deterministic replay export. M3.1 playtest polish:
+  confirm-first cascade (no board click ever fires without a confirm popup;
+  tributes are always picked explicitly), a coloured/uid-named event log,
+  acting-card highlights, own-set-card peek, hover tooltips, and pass-vs-continue
+  labelling.
 - `results/` — experiment outputs. `E*` = historical M2 runs (pre-ratification
   rules), `R0`/`R1`/`R4` = current-rules baseline matrix, ante sweep, and
   first-turn-draw experiment. Only the `REPORT.md` files are checked in; raw
@@ -85,6 +89,17 @@ npm run gen:rules-gaps
   quads winning hands), zero crashes/stalls across 870k+ games. Open items for
   the designers: ante value, banker-mirror second-player edge, K+Ace-as-11
   as premier removal.
+- **Ratified rules (2026-07 playtest round):** two rules landed in the engine
+  from the first browser playtest — (1) a manually flipped monster cannot switch
+  position the same turn; (2) **flip effects are declinable** (the controller is
+  offered a new `flipDecision` pending — activate or skip — before the trigger
+  hits the stack); (3) **bank-trigger scaling by effective power** — a combat bank
+  trigger now grants a card count banded by the winning blow's power (1-4 → 1
+  card, 5-7 → 2, 8+ → 3). Ratified default is **`margin`** (YGO-style: a direct
+  hit lands full attacker power, a combat kill scales by winner-minus-loser); the
+  `bankTriggerScaling` knob also offers `power` (winner's own power) and `off`
+  (flat 1). Simulated across 120k games before ratification — see `results/R6`
+  and the R6 section of M2-FINDINGS.md.
 - **M3 (browser prototype): implemented, awaiting the human gate.** `npm run
   web` serves a full duel vs greedy from a shown seed. Every action type and
   pending decision from the brief's inventory is operable (mulligan multi-

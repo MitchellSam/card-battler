@@ -16,6 +16,7 @@ import {
   type Step,
   type VerbKey,
 } from './interact/cascade.js';
+import { actionSummary } from './interact/summary.js';
 import { AI, GameSession, HUMAN } from './session/GameSession.js';
 import { PLAYER_NAMES } from './session/describeEvent.js';
 import { faceFromId, faceLabel, faceOf } from './ui/cardFace.js';
@@ -69,6 +70,9 @@ export function App() {
 
   // interaction state
   const [sel, setSel] = useState<Sel | null>(null);
+  // Confirm-first: a fully-composed cascade action awaiting an explicit
+  // Confirm click (no board action ever fires straight from a click).
+  const [confirm, setConfirm] = useState<Action | null>(null);
   const [msel, setMsel] = useState<Set<number>>(new Set()); // mulligan multi-select
   const [bankSub, setBankSub] = useState<'bank' | 'remove' | null>(null);
   const [pileOpen, setPileOpen] = useState<PileId | null>(null);
@@ -81,6 +85,7 @@ export function App() {
     if (lastVersion.current !== version) {
       lastVersion.current = version;
       setSel(null);
+      setConfirm(null);
       setBankSub(null);
       setMsel(new Set());
     }
@@ -98,6 +103,7 @@ export function App() {
       session.dispose();
       setSession(makeSession(seed, settings));
       setSel(null);
+      setConfirm(null);
       setBankSub(null);
       setMsel(new Set());
       setPileOpen(null);
@@ -136,9 +142,16 @@ export function App() {
     if (s.origin.kind === 'stZone') return view.you.spellTraps[s.origin.zoneIndex]?.card ?? null;
     return view.you.monsters[s.origin.zoneIndex]?.card ?? null;
   };
+  const uidFaceLabel = (uid: number): string => {
+    for (const sv of [view.you, view.opponent]) {
+      const m = sv.monsters.find((x) => x?.uid === uid);
+      if (m?.card) return faceLabel({ rank: m.card.rank, suit: m.card.suit });
+    }
+    return session.uidName(uid) ?? 'the monster';
+  };
 
   // ---- highlights ------------------------------------------------------------
-  const highlights = useMemo(() => {
+  const baseHighlights = useMemo(() => {
     const h = new Map<string, Highlight>();
     const put = (c: Cell, v: Highlight) => h.set(cellKey(c), v);
     if (over) return h;
@@ -225,44 +238,72 @@ export function App() {
       return h;
     }
 
+    // A parked confirm suppresses idle affordances — only Confirm/Cancel act.
+    if (confirm) return h;
+
     // idle: origin affordances straight from legal()
     for (const i of handOrigins(legal)) put({ t: 'hand', i }, 'act');
     for (const z of monsterOrigins(legal)) put({ t: 'myMonster', zone: z }, 'act');
     for (const z of stZoneOrigins(legal)) put({ t: 'myST', zone: z }, 'act');
     return h;
-  }, [legal, humanPending, bankSub, mulliganActive, msel, sel, step, view, over]);
+  }, [legal, humanPending, bankSub, mulliganActive, msel, sel, step, view, over, confirm]);
+
+  // Acting-card highlights: whatever monster the top-of-stack items involve.
+  const highlights = useMemo(() => {
+    const h = new Map(baseHighlights);
+    const markUid = (uid: number) => {
+      const c = monsterCellByUid(uid);
+      if (c && !h.has(cellKey(c))) h.set(cellKey(c), 'acting');
+    };
+    for (const item of view.stack) {
+      if (item.kind === 'attack') {
+        markUid(item.attackerUid);
+        if (typeof item.target === 'number') markUid(item.target);
+      } else if (item.kind === 'combat') {
+        markUid(item.attackerUid);
+        markUid(item.targetUid);
+      } else if (item.kind === 'flip') {
+        markUid(item.monsterUid);
+        if (item.targetMonsterUid !== undefined) markUid(item.targetMonsterUid);
+      }
+    }
+    return h;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseHighlights, view.stack]);
 
   // ---- cascade advance -------------------------------------------------------
+  // A finished cascade never dispatches straight away — it parks the action in
+  // `confirm` for an explicit Confirm click.
   const choose = useCallback(
     (value: unknown) => {
       if (!sel || !step) return;
       const s2 = applyChoice(sel, step, value);
       const st2 = nextStep(legal, s2);
       if (st2.kind === 'ready') {
-        dispatch(st2.action);
         setSel(null);
+        setConfirm(st2.action);
       } else if (st2.kind === 'dead') {
         setSel(null);
       } else {
         setSel(s2);
       }
     },
-    [sel, step, legal, dispatch],
+    [sel, step, legal],
   );
 
   const startCascade = useCallback(
     (origin: Sel['origin']) => {
       const st = nextStep(legal, { origin });
-      if (st.kind === 'ready') dispatch(st.action);
+      if (st.kind === 'ready') setConfirm(st.action);
       else if (st.kind !== 'dead') setSel({ origin });
     },
-    [legal, dispatch],
+    [legal],
   );
 
   // ---- cell click routing ------------------------------------------------------
   const onCell = useCallback(
     (cell: Cell) => {
-      if (over) return;
+      if (over || confirm) return; // a parked confirm blocks all board clicks
       if (humanPending) {
         switch (humanPending.type) {
           case 'discard':
@@ -343,7 +384,7 @@ export function App() {
       else if (cell.t === 'myST' && stZoneOrigins(legal).has(cell.zone))
         startCascade({ kind: 'stZone', zoneIndex: cell.zone });
     },
-    [over, humanPending, bankSub, mulliganActive, sel, step, legal, dispatch, choose, startCascade, view],
+    [over, confirm, humanPending, bankSub, mulliganActive, sel, step, legal, dispatch, choose, startCascade, view],
   );
 
   // ---- prompt column content ---------------------------------------------------
@@ -351,6 +392,28 @@ export function App() {
 
   function buildPrompt(): React.ReactNode {
     if (over) return null;
+
+    // Confirm-first: a parked action awaits an explicit Confirm click.
+    if (confirm) {
+      return (
+        <PromptNote
+          title="✔ CONFIRM"
+          body={actionSummary(confirm, view, (uid) => session.uidName(uid))}
+          buttons={[
+            {
+              label: 'CONFIRM',
+              tone: 'green',
+              onClick: () => {
+                const a = confirm;
+                setConfirm(null);
+                dispatch(a);
+              },
+            },
+            { label: '✕ cancel', onClick: () => setConfirm(null) },
+          ]}
+        />
+      );
+    }
 
     if (humanPending) {
       switch (humanPending.type) {
@@ -373,12 +436,38 @@ export function App() {
               body={
                 <>
                   Bank a card from your hand <b className="marker">OR</b> remove a card from their bank.
+                  {humanPending.remaining > 1 && (
+                    <>
+                      {' '}
+                      <b className="marker" style={{ color: 'var(--red)' }}>
+                        {humanPending.remaining} left!
+                      </b>
+                    </>
+                  )}
                 </>
               }
               buttons={buttons}
             />
           );
         }
+        case 'flipDecision':
+          return (
+            <PromptNote
+              title="⚡ FLIP EFFECT?"
+              body={`${uidFaceLabel(humanPending.sourceUid)} flipped up — use its "${humanPending.effectRank}" effect?`}
+              buttons={[
+                {
+                  label: 'ACTIVATE',
+                  tone: 'green',
+                  onClick: () => dispatch(legal.find((a) => a.type === 'flipChoice' && a.choice === 'activate')),
+                },
+                {
+                  label: 'DECLINE',
+                  onClick: () => dispatch(legal.find((a) => a.type === 'flipChoice' && a.choice === 'decline')),
+                },
+              ]}
+            />
+          );
         case 'flipTarget':
           return <PromptNote title="⚡ FLIP EFFECT" body="Pick a target monster (highlighted)." />;
         case 'interceptor':
@@ -550,6 +639,9 @@ export function App() {
   const phaseButtonLabel =
     view.phase === 'main1' ? 'END MAIN ▸' : view.phase === 'battle' ? 'END BATTLE ▸' : 'END TURN ▸';
   const inWindow = view.stack.length > 0 || view.pendingWindow !== null;
+  // "Pass" only when there is a live stack to decline responding to; a phase
+  // window with an empty stack reads better as "Continue".
+  const passLabel = view.stack.length > 0 ? 'PASS' : 'CONTINUE ▸';
 
   const priorityColumn = over ? null : (
     <div style={{ width: 230, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
@@ -582,7 +674,7 @@ export function App() {
       <div style={{ display: 'flex', gap: 8 }}>
         {passAction && !session.autoPassing && (
           <button className="note-btn" onClick={() => dispatch(passAction)} style={{ transform: 'rotate(1deg)' }}>
-            PASS
+            {passLabel}
           </button>
         )}
         {nextPhaseAction && (
@@ -659,7 +751,7 @@ export function App() {
             }
           />
         </div>
-        <EventLog events={session.events} />
+        <EventLog events={session.events} resolveUid={(uid) => session.uidName(uid)} />
       </div>
 
       {pileModal}

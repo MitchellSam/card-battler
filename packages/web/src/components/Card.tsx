@@ -3,7 +3,7 @@
 
 import type { CSSProperties } from 'react';
 
-export type Highlight = 'act' | 'sel' | 'target' | null;
+export type Highlight = 'act' | 'sel' | 'target' | 'acting' | null;
 
 export interface CardProps {
   rank?: string;
@@ -20,6 +20,21 @@ export interface CardProps {
 
 const RED_SUITS = new Set(['♥', '♦']);
 
+export function hlClass(highlight: Highlight | undefined): string {
+  switch (highlight) {
+    case 'act':
+      return 'hl-act';
+    case 'sel':
+      return 'hl-sel';
+    case 'target':
+      return 'hl-target';
+    case 'acting':
+      return 'hl-acting';
+    default:
+      return '';
+  }
+}
+
 export function Card({
   rank = 'A',
   suit = '♠',
@@ -34,7 +49,7 @@ export function Card({
 }: CardProps) {
   const joker = rank === 'JOKER';
   const color = joker ? '#7a3fa0' : RED_SUITS.has(suit ?? '') ? '#c0392b' : '#242b3a';
-  const cls = highlight === 'act' ? 'hl-act' : highlight === 'sel' ? 'hl-sel' : highlight === 'target' ? 'hl-target' : '';
+  const cls = hlClass(highlight);
   return (
     <div
       className={cls}

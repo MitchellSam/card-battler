@@ -263,15 +263,11 @@ export function nextStep(legal: Action[], sel: Sel): Step {
     const step = pendingParam(cands, cur);
     if (step === null) break;
     const opts = step.options as unknown[];
-    if (step.kind === 'chooseSacrifices') {
-      const remaining = step.required - step.chosen.length;
-      if (opts.length > remaining) return step; // a real choice
-      // forced: every remaining option is needed — take them all
-      cur = { ...cur, sacrifices: [...step.chosen, ...(opts as number[])] };
-    } else {
-      if (opts.length > 1) return step;
-      cur = applyChoice(cur, step, opts[0]);
-    }
+    // Sacrifice selection is ALWAYS explicit — the player picks which monsters
+    // to tribute, even when the choice is forced (ratified UX 2026-07).
+    if (step.kind === 'chooseSacrifices') return step;
+    if (opts.length > 1) return step;
+    cur = applyChoice(cur, step, opts[0]);
     cands = candidatesFor(legal, cur);
     if (cands.length === 0) return { kind: 'dead' };
   }

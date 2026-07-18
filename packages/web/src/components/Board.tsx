@@ -7,6 +7,7 @@
 import { bestHand, toHandResult, type GameCard, type PlayerView, type SideView } from '@house-rules/engine';
 import { PLAYER_NAMES } from '../session/describeEvent.js';
 import { AI, HUMAN } from '../session/GameSession.js';
+import { cardTooltip } from '../ui/cardFace.js';
 import { Card, type Highlight } from './Card.js';
 import { MonsterZone, STZone } from './Zone.js';
 
@@ -242,6 +243,7 @@ function FieldRow({
             mine={mine}
             monster={m}
             highlight={hl}
+            peek={mine}
             onClick={hl ? () => onCell(cell) : undefined}
           />
         );
@@ -260,6 +262,7 @@ function FieldRow({
             mine={mine}
             slot={st}
             highlight={hl}
+            peek={mine}
             onClick={hl ? () => onCell(cell) : undefined}
           />
         );
@@ -361,9 +364,10 @@ export function Board({ view, highlights, onCell, onOpenPile, center }: BoardPro
               <Card
                 rank={c.rank}
                 suit={c.suit}
-                w={68}
-                h={96}
+                w={72}
+                h={100}
                 highlight={hl}
+                title={cardTooltip({ rank: c.rank, suit: c.suit })}
                 onClick={hl ? () => onCell(cell) : undefined}
               />
             </div>

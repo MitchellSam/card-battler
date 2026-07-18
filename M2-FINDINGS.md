@@ -325,3 +325,54 @@ should stay open: if playtests show 10s never feel safe, the lever is the Ace
   the second player. Playtest item.
 - New: **ante value for Run mode** (recommend 5) and the two provisional edges in
   `RULES-GAPS.md` (Joker-only-deck forced stand; multi-interceptor defender-chooses).
+
+## R6 — bank-trigger scaling by effective power (2026-07 experiment, `results/R6`)
+
+Ratification candidate from the brother's first-playtest feedback: scale a combat
+bank trigger by the winning monster's strength. Implemented as the
+`bankTriggerScaling` config knob banded by **effective power at trigger time**
+(1-4 → 1 card, 5-7 → 2, 8+ → 3), so temp-power effects count — an Ace pumped to 11
+scores 3, a King-debuffed monster scores less. Two modes:
+
+- **`power`** — the winning monster's own power (a direct hit uses the attacker's
+  power; a combat kill uses the winner's).
+- **`margin`** — YGO-style: a direct hit lands full attacker power, but a combat
+  kill bands the *difference* (winner power − loser power). A blowout pays 3; a
+  won-by-1 near-mirror pays only 1.
+
+(Supersedes the earlier tribute-cost prototype: for base-power monsters the two
+agree, but effective-power is what the designer ratified, and `margin` replaces the
+never-intended `victim` mode.) 120k games, zero stalls/crashes.
+
+**Greedy mirror (pacing benchmark), off → power → margin:**
+
+| metric | off | power | margin |
+|---|---|---|---|
+| median turns | 43 | 42 | 42 |
+| mean bank size (both seats) | 5.9 / 6.0 | 6.8 / 7.0 | 6.4 / 6.5 |
+| winner's bank at showdown | 9.7 | 11.1 | 10.7 |
+| cards banked / game (total ÷ 10k) | 15.6 | 21.0 | 18.3 |
+| bank triggers *earned* / game | 18.3 | 15.7 | 15.9 |
+| junk (high-card) wins | 4% | 1% | 1% |
+| full-house + quads wins | 71% | 78% | 78% |
+| first-player win % | 46.8 | 48.7 | 48.2 |
+| draws / stalls | 0 | 0 | 0 |
+
+**Read.** Both modes are mechanically safe — pacing in band (median 42), mirror
+win-rate ~50%, first-player balance intact, zero draws/stalls — and both do the
+intended job: junk-hand wins collapse 4% → 1%, FH+quads climb to 78%, the game
+shortens ~1 turn. The difference between them is *how much banking they add over
+baseline*: `power` roughly doubles the surplus that `margin` does (+5.4 vs +2.7
+cards banked/game over the 15.6 baseline). `margin` is more selective — it banks
+fewer cards but concentrates them on decisive wins, so near-mirror grinds pay
+little and blowouts/breakthroughs pay full; its *winning* hands are if anything a
+hair stronger (FH 49% vs 48%). Neither touches the banker-mirror draw class (49.1%
+under all three — bankers rarely win combats, so scaling never fires; ante's job).
+
+**Recommendation → RATIFIED.** The sim cleared **`margin`** — the designer's
+YGO-consistent preference — with no reservations: it lifts hand quality and kills
+junk wins without bloating banks or harming pacing. `margin` is now the canonical
+`DEFAULT_CONFIG.bankTriggerScaling` (`power` and `off` remain selectable knob
+values). The fullgame acceptance script pins `off` to preserve its M1-era bank
+sequence; scaling has its own coverage in `bank-scaling.test.ts`. The only open
+item is the pure feel-check in live play; the mechanics are proven safe.

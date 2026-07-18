@@ -18,11 +18,11 @@ export interface PromptNoteProps {
 export function PromptNote({ title, body, buttons = [], children }: PromptNoteProps) {
   return (
     <div className="note">
-      <div className="marker" style={{ fontSize: 14, color: 'var(--red)', marginBottom: 5 }}>
+      <div className="marker" style={{ fontSize: 17, color: 'var(--red)', marginBottom: 6 }}>
         {title}
       </div>
       {body !== undefined && (
-        <div style={{ fontSize: 14, lineHeight: 1.2, marginBottom: 8 }}>{body}</div>
+        <div style={{ fontSize: 16, lineHeight: 1.3, marginBottom: 9 }}>{body}</div>
       )}
       {children}
       {buttons.length > 0 && (

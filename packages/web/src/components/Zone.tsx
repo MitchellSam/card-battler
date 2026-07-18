@@ -2,7 +2,7 @@
 // rotated 90°, set spells not — canon rule 4), power badge, highlight states.
 
 import type { MonsterView, SetSpellView } from '@house-rules/engine';
-import { Card, type Highlight } from './Card.js';
+import { Card, hlClass, type Highlight } from './Card.js';
 
 interface ZoneShellProps {
   kind: 'monster' | 'st';
@@ -24,7 +24,7 @@ function ZoneShell({ kind, label, occupied, highlight, onClick, children, badge 
         ? 'var(--szone-occ)'
         : 'var(--szone)';
   const inkDim = kind === 'monster' ? 'rgba(90,42,30,.5)' : 'rgba(47,66,87,.5)';
-  const cls = highlight === 'act' ? 'hl-act' : highlight === 'sel' ? 'hl-sel' : highlight === 'target' ? 'hl-target' : '';
+  const cls = hlClass(highlight);
   return (
     <div
       className={cls}
@@ -77,11 +77,14 @@ export interface MonsterZoneProps {
   mine: boolean;
   monster: MonsterView | null;
   highlight?: Highlight;
+  /** Show your own face-down set card's identity (a peel-corner peek). */
+  peek?: boolean;
   onClick?: () => void;
 }
 
-export function MonsterZone({ zoneIndex, mine, monster, highlight, onClick }: MonsterZoneProps) {
+export function MonsterZone({ zoneIndex, mine, monster, highlight, peek, onClick }: MonsterZoneProps) {
   const m = monster;
+  const peeking = mine && !!peek && m !== null && m.position === 'set' && m.card !== null;
   const posMark =
     m === null ? '' : m.position === 'attack' ? ' ⚔' : m.position === 'defense' ? ' 🛡' : ' SET';
   const label = `M${zoneIndex + 1}${posMark}`;
@@ -123,13 +126,32 @@ export function MonsterZone({ zoneIndex, mine, monster, highlight, onClick }: Mo
         <Card
           rank={m.card?.rank ?? undefined}
           suit={m.card?.suit ?? null}
-          faceDown={m.card === null || m.position === 'set'}
+          faceDown={m.card === null || (m.position === 'set' && !peeking)}
           rotated={m.position !== 'attack'}
           w={50}
           h={70}
-          title={mine && m.position === 'set' && m.card ? `set: ${m.card.rank}${m.card.suit ?? ''}` : undefined}
+          title={mine && m.position === 'set' && m.card ? `your set monster: ${m.card.rank}${m.card.suit ?? ''}` : undefined}
+          style={peeking ? { opacity: 0.72, filter: 'sepia(0.35)' } : undefined}
         />
       ) : undefined}
+      {peeking && (
+        <span
+          className="gochi"
+          style={{
+            position: 'absolute',
+            bottom: 1,
+            left: 4,
+            fontSize: 9,
+            color: '#5a2a1e',
+            background: 'rgba(245,238,216,.85)',
+            padding: '0 3px',
+            borderRadius: 2,
+            zIndex: 3,
+          }}
+        >
+          set
+        </span>
+      )}
     </ZoneShell>
   );
 }
@@ -139,10 +161,12 @@ export interface STZoneProps {
   mine: boolean;
   slot: SetSpellView | null;
   highlight?: Highlight;
+  peek?: boolean;
   onClick?: () => void;
 }
 
-export function STZone({ zoneIndex, mine, slot, highlight, onClick }: STZoneProps) {
+export function STZone({ zoneIndex, mine, slot, highlight, peek, onClick }: STZoneProps) {
+  const peeking = mine && !!peek && slot !== null && slot.card !== null;
   return (
     <ZoneShell
       kind="st"
@@ -153,10 +177,13 @@ export function STZone({ zoneIndex, mine, slot, highlight, onClick }: STZoneProp
     >
       {slot !== null ? (
         <Card
-          faceDown
+          rank={peeking ? slot.card!.rank : undefined}
+          suit={peeking ? slot.card!.suit : null}
+          faceDown={!peeking}
           w={50}
           h={70}
-          title={mine && slot.card ? `set: ${slot.card.rank}${slot.card.suit ?? ''}` : undefined}
+          title={mine && slot.card ? `your set spell/trap: ${slot.card.rank}${slot.card.suit ?? ''}` : undefined}
+          style={peeking ? { opacity: 0.72, filter: 'sepia(0.35)' } : undefined}
         />
       ) : undefined}
     </ZoneShell>
