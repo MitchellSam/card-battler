@@ -13,7 +13,7 @@ describe('flip effects', () => {
     let r = applyAction(s, { type: 'flipMonster', player: 0, zoneIndex: 0 }, rng0());
     expect(r.state.players[0].monsters[0]?.position).toBe('attack');
     // Ratified (2026-07): the flip is offered first, not forced onto the stack.
-    expect(r.state.pending).toMatchObject({ type: 'flipDecision', player: 0, effectRank: 'A' });
+    expect(r.state.pending).toMatchObject({ type: 'flipDecision', player: 0, effect: 'default:A' });
     r = flipChoice(r.state, rng0(), 'activate');
     expect(r.state.stack).toHaveLength(1); // respondable trigger, now on the stack
     r = resolveStack(r.state, rng0());
@@ -58,7 +58,7 @@ describe('flip effects', () => {
       p0: { monsters: [mon(card(0, '4', '♠'), 'set', 1, { setTurn: 3 })], deck: fillerDeck(0, 5) },
     });
     let r = applyAction(s, { type: 'flipMonster', player: 0, zoneIndex: 0 }, rng0());
-    expect(r.state.pending).toMatchObject({ type: 'flipDecision', player: 0, effectRank: '4' });
+    expect(r.state.pending).toMatchObject({ type: 'flipDecision', player: 0, effect: 'default:4' });
     r = flipChoice(r.state, rng0(), 'decline');
     expect(types(r.events)).toContain('FlipDeclined');
     expect(r.state.stack).toHaveLength(0); // no trigger queued
@@ -79,7 +79,7 @@ describe('flip effects', () => {
     let r = applyAction(s, { type: 'declareAttack', player: 0, attackerZone: 0, targetZone: 0 }, rng0());
     // both pass; attack resolves, the 6 flips, and its controller is offered the effect
     r = run(r.state, rng0(), { type: 'pass', player: 0 }, { type: 'pass', player: 1 });
-    expect(r.state.pending).toMatchObject({ type: 'flipDecision', player: 1, effectRank: '6' });
+    expect(r.state.pending).toMatchObject({ type: 'flipDecision', player: 1, effect: 'default:6' });
     r = flipChoice(r.state, rng0(), 'decline'); // don't bounce — take the fight
     r = resolveStack(r.state, rng0()); // combat resolves: 7 > 6, the 6 is destroyed
     expect(r.state.players[1].monsters[0]).toBeNull();

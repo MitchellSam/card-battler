@@ -2,7 +2,14 @@
 // action, shown in the confirm-first popup before it is dispatched. Pure
 // presentation — no rules logic.
 
-import type { Action, PlayerView } from '@house-rules/engine';
+import {
+  describeEffect,
+  effectiveCardEffect,
+  effectiveSuitEffect,
+  type Action,
+  type GameCard,
+  type PlayerView,
+} from '@house-rules/engine';
 import { HUMAN } from '../session/GameSession.js';
 import { faceFromId, faceLabel } from '../ui/cardFace.js';
 
@@ -23,12 +30,42 @@ function stFace(view: PlayerView, zoneIndex: number): string {
   return st?.card ? faceLabel({ rank: st.card.rank, suit: st.card.suit }) : 'set card';
 }
 
-const EFFECT_VERB: Record<string, string> = {
-  negate: 'negate',
-  revive: 'revive',
-  snipe: 'snipe a set spell/trap',
-  poly: 'Polymerize',
-};
+function sourceCard(a: Extract<Action, { type: 'castSpell' }>, view: PlayerView): GameCard | null {
+  return a.source.from === 'hand'
+    ? (view.you.hand?.[a.source.handIndex] ?? null)
+    : (view.you.spellTraps[a.source.zoneIndex]?.card ?? null);
+}
+
+/** The effect id a castSpell action resolves (REVISION 2: sticker/sheet-aware). */
+function castEffect(a: Extract<Action, { type: 'castSpell' }>, view: PlayerView): string | null {
+  const card = sourceCard(a, view);
+  if (!card) return null;
+  return a.mode === 'rank'
+    ? effectiveCardEffect(card)
+    : effectiveSuitEffect(view.suitOverrides, view.player, card.suit!);
+}
+
+/**
+ * A loud warning when a composed action would hit one of the player's OWN cards
+ * destructively (♣ snipe on your set card, J destroy / K weaken on your monster)
+ * — shown in the confirm popup so a single-target auto-advance can't quietly
+ * blow up your own board. Returns null when nothing self-destructive is targeted.
+ */
+export function selfTargetWarning(a: Action, view: PlayerView, uidName: UidName): string | null {
+  if (a.type !== 'castSpell') return null;
+  if (a.targetSTZone && a.targetSTZone.player === HUMAN)
+    return `This DESTROYS your own set card in S${a.targetSTZone.zoneIndex + 1}.`;
+  if (a.targetMonsterUid !== undefined) {
+    const mine = view.you.monsters.some((m) => m?.uid === a.targetMonsterUid);
+    if (!mine) return null;
+    const eff = castEffect(a, view);
+    const face = uidName(a.targetMonsterUid) ?? 'your monster';
+    if (eff === 'default:J' || eff === 'executioners-toll')
+      return `This DESTROYS your own ${face}.`;
+    if (eff === 'default:K') return `This WEAKENS your own ${face}.`;
+  }
+  return null;
+}
 
 export function actionSummary(a: Action, view: PlayerView, uidName: UidName): string {
   const mon = (uid?: number): string => (uid !== undefined ? (uidName(uid) ?? 'a monster') : '?');
@@ -46,26 +83,21 @@ export function actionSummary(a: Action, view: PlayerView, uidName: UidName): st
     case 'castSpell': {
       const src =
         a.source.from === 'hand' ? handFace(view, a.source.handIndex) : stFace(view, a.source.zoneIndex);
-      if (a.mode === 'rank') {
-        const verb =
-          a.targetMonsterUid !== undefined ? ` on ${mon(a.targetMonsterUid)}` : '';
-        const fuel = a.discardHandIndex !== undefined ? `, discarding ${handFace(view, a.discardHandIndex)}` : '';
-        const ace = a.aceValue !== undefined ? ` (Ace as ${a.aceValue})` : '';
-        return `Cast ${src} rank effect${verb}${fuel}${ace}?`;
-      }
-      const suit = src.slice(-1);
-      const verb = EFFECT_VERB[suitEffect(suit)] ?? 'use suit effect';
+      const eff = castEffect(a, view);
+      const effName = eff ? describeEffect(eff).name : a.mode === 'rank' ? 'rank effect' : 'suit effect';
       const tgt =
         a.targetMonsterUid !== undefined
           ? ` on ${mon(a.targetMonsterUid)}`
           : a.targetStackItemId !== undefined
-            ? ` the stack item`
+            ? ` on the stack item`
             : a.graveTarget
-              ? ` ${faceLabel(faceFromId(a.graveTarget.cardId))} (${a.summonPosition})`
+              ? ` — ${faceLabel(faceFromId(a.graveTarget.cardId))} (${a.summonPosition})`
               : a.targetSTZone
-                ? ` ${a.targetSTZone.player === HUMAN ? 'your' : "Riley's"} S${a.targetSTZone.zoneIndex + 1}`
+                ? ` on ${a.targetSTZone.player === HUMAN ? 'your' : "Riley's"} S${a.targetSTZone.zoneIndex + 1}`
                 : '';
-      return `Cast ${src} to ${verb}${tgt}?`;
+      const fuel = a.discardHandIndex !== undefined ? `, discarding ${handFace(view, a.discardHandIndex)}` : '';
+      const ace = a.aceValue !== undefined ? ` (Ace as ${a.aceValue})` : '';
+      return `Cast ${src} — "${effName}"${tgt}${fuel}${ace}?`;
     }
     case 'castJoker':
       return `Cast Joker (draw 2)?`;
@@ -86,8 +118,4 @@ function oppZoneFace(view: PlayerView, zoneIndex?: number): string {
   if (zoneIndex === undefined) return 'a monster';
   const m = view.opponent.monsters[zoneIndex];
   return m?.card ? faceLabel({ rank: m.card.rank, suit: m.card.suit }) : 'a set monster';
-}
-
-function suitEffect(suit: string): string {
-  return suit === '♠' ? 'negate' : suit === '♥' ? 'revive' : suit === '♣' ? 'snipe' : 'poly';
 }

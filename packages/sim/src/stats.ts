@@ -132,7 +132,7 @@ export function buildRecord(
       case 'SpellCast':
       case 'SpellActivated':
         bump(per[p]!.spellsCast, e.effect as string);
-        if (e.effect === 'K-rank') {
+        if (e.effect === 'default:K') {
           per[p]!.kRank.casts++;
           // amount 11 is only reachable via an Ace chosen as 11 (numbers cap at 10)
           if (e.amount === 11) per[p]!.kRank.aceAs11++;
@@ -182,7 +182,7 @@ export function buildRecord(
         break;
       }
       case 'FlipTriggered':
-        bump(per[p]!.flipTriggersByRank, e.effectRank as string);
+        bump(per[p]!.flipTriggersByRank, e.effect as string);
         break;
       case 'CardsMilled': {
         const n = (e.cardIds as string[]).length;

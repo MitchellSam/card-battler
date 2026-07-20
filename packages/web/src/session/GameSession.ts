@@ -10,11 +10,14 @@
 
 import {
   applyAction,
+  createDeck,
   createRng,
   legalActions,
   setupGame,
+  shuffle,
   viewFor,
   type Action,
+  type GameCard,
   type GameEvent,
   type GameState,
   type PlayerId,
@@ -32,12 +35,25 @@ export interface SessionOptions {
   agentName?: string;
   /** Pause between AI actions so events read as beats. 0 = fully synchronous (tests). */
   aiDelayMs?: number;
-  /** Auto-dispatch when the human's only legal action is `pass`. Pacing lever — dev-panel toggle. */
+  /** Auto-dispatch response-window passes (see pump). Pacing lever — dev-panel toggle. */
   autoPass?: boolean;
-  /** Visible pulse before an auto-pass fires. 0 = immediate (tests). */
+  /** Visible pulse before a *forced* auto-pass (nothing to respond with). 0 = immediate (tests). */
   autoPassDelayMs?: number;
+  /**
+   * Pulse before an *interruptible* auto-pass — a response window where the
+   * human COULD activate a set card but usually just wants to pass. Longer than
+   * autoPassDelayMs so there's time to hit RESPOND. 0 disables interruptible
+   * auto-pass (so tests keep the old only-pass-auto-passes behaviour).
+   */
+  autoPassRespondMs?: number;
   /** Dev-panel-only config overrides (e.g. wallPunishSelector for smoke-testing the pick prompt). */
   config?: Partial<RulesConfig>;
+  /**
+   * Run mode (M4): the human's stickered run deck (seat 0). Both it and the
+   * AI's stock deck are shuffled with the session's engine RNG, so a duelSeed
+   * fully determines the deal — exactly like the headless full-run test.
+   */
+  humanDeck?: GameCard[];
 }
 
 export interface SessionStats {
@@ -77,10 +93,15 @@ export class GameSession {
   version = 0;
   /** true while an auto-pass timer is pending — UI pulses the priority marker. */
   autoPassing = false;
+  /** True while the pending auto-pass is interruptible — the UI shows RESPOND. */
+  autoPassRespondable = false;
 
   private aiDelayMs: number;
   private autoPassEnabled: boolean;
   private readonly autoPassDelayMs: number;
+  private readonly autoPassRespondMs: number;
+  /** Set when the human hits RESPOND; suppresses auto-pass for the current window only. */
+  private autoPassSuppressed = false;
 
   private readonly startedAt: number;
   private endedAt: number | null = null;
@@ -98,13 +119,24 @@ export class GameSession {
     this.aiDelayMs = opts.aiDelayMs ?? 400;
     this.autoPassEnabled = opts.autoPass ?? true;
     this.autoPassDelayMs = opts.autoPassDelayMs ?? 600;
+    this.autoPassRespondMs = opts.autoPassRespondMs ?? 3000;
     this.now = now;
 
     this.engineRng = createRng(seed);
     this.agent = getAgent(this.agentName);
     this.agentRng = createRng(agentSeed(seed, AI));
 
-    const setup = setupGame(this.engineRng, opts.config ? { config: opts.config } : {});
+    const setup = setupGame(this.engineRng, {
+      ...(opts.config ? { config: opts.config } : {}),
+      ...(opts.humanDeck
+        ? {
+            decks: [
+              shuffle(structuredClone(opts.humanDeck), this.engineRng),
+              shuffle(createDeck(AI), this.engineRng),
+            ] as [GameCard[], GameCard[]],
+          }
+        : {}),
+    });
     this.state = setup.state;
     this.events.push(...setup.events);
     this.startedAt = now();
@@ -172,6 +204,7 @@ export class GameSession {
     if (this.autoPassing) {
       this.clearTimer();
       this.autoPassing = false;
+      this.autoPassRespondable = false;
     }
     if (this.thinkStart !== null) {
       this.humanThinkMs += this.now() - this.thinkStart;
@@ -216,6 +249,19 @@ export class GameSession {
     this.listeners.clear();
   }
 
+  /**
+   * Re-arm a disposed session and resume driving it. React StrictMode (dev)
+   * runs every effect's cleanup+setup TWICE on mount, so an owner's
+   * `return () => session.dispose()` kills the session right after the first
+   * mount — every click then throws 'session disposed' and the AI timer never
+   * fires. Owners must call activate() in the effect setup to undo it.
+   */
+  activate(): void {
+    if (!this.disposed) return;
+    this.disposed = false;
+    this.pump();
+  }
+
   // --- internals -----------------------------------------------------------
 
   /** Human-readable card face for a monster uid, if its identity is public. */
@@ -229,7 +275,22 @@ export class GameSession {
     this.events.push(...r.events);
     this.actionLog.push(action);
     this.recordIdentities(r.events);
+    this.autoPassSuppressed = false; // new state → a fresh window may auto-pass again
     this.version++;
+  }
+
+  /**
+   * RESPOND: the human wants to act in a window that was about to auto-pass.
+   * Cancels the pending auto-pass and suppresses it for THIS window only (until
+   * the next state change), handing a real decision point back.
+   */
+  cancelAutoPass(): void {
+    this.clearTimer();
+    this.autoPassing = false;
+    this.autoPassRespondable = false;
+    this.autoPassSuppressed = true;
+    if (this.thinkStart === null) this.thinkStart = this.now();
+    this.notify();
   }
 
   /** Track uid→face for events that reveal a monster's identity to the human. */
@@ -267,22 +328,39 @@ export class GameSession {
         continue;
       }
       const legal = this.legal();
-      const only = legal.length === 1 ? legal[0] : undefined;
-      if (this.autoPassEnabled && only && only.type === 'pass') {
+      const kind = this.autoPassEnabled && !this.autoPassSuppressed ? autoPassKind(legal) : 'none';
+      // 'forced' = pass is the only option (nothing to respond with) → quick pulse.
+      // 'optional' = a response window where the human COULD activate a set card
+      // but usually just wants to pass → longer, interruptible pulse with RESPOND.
+      // Interruptible auto-pass only runs in real time (delay > 0), so headless
+      // tests keep the original "only pass auto-passes" behaviour.
+      const doForced = kind === 'forced';
+      // Interruptible auto-pass is a real-time UX beat (needs time to hit
+      // RESPOND); autoPassDelayMs === 0 is synchronous/test mode, where it's off.
+      const doOptional =
+        kind === 'optional' && this.autoPassRespondMs > 0 && this.autoPassDelayMs > 0;
+      if (doForced || doOptional) {
         this.thinkStart = null; // not a human decision — never bill it to the think clock
-        if (this.autoPassDelayMs > 0) {
+        const delay = doOptional ? this.autoPassRespondMs : this.autoPassDelayMs;
+        if (delay > 0) {
           this.autoPassing = true;
+          this.autoPassRespondable = doOptional;
           this.version++;
-          this.schedule(this.autoPassDelayMs, () => {
+          this.schedule(delay, () => {
             this.autoPassing = false;
+            this.autoPassRespondable = false;
             // Revalidate at fire time — never apply a stale captured action.
             const fresh = this.legal();
-            if (actorFor(this.state) === HUMAN && fresh.length === 1 && fresh[0]!.type === 'pass')
-              this.apply(fresh[0]!);
+            if (
+              actorFor(this.state) === HUMAN &&
+              !this.autoPassSuppressed &&
+              autoPassKind(fresh) !== 'none'
+            )
+              this.apply({ type: 'pass', player: HUMAN });
           });
           return;
         }
-        this.apply(only);
+        this.apply({ type: 'pass', player: HUMAN });
         continue;
       }
       // A real human decision point: start the think clock.
@@ -325,4 +403,24 @@ export class GameSession {
   private notify(): void {
     for (const fn of this.listeners) fn();
   }
+}
+
+/**
+ * Classify a human decision point for auto-pass. `pass` is only ever legal in a
+ * response/priority window (never on your own empty-stack main phase), so its
+ * presence marks a window:
+ *   - 'forced'   → pass is the only option (nothing to respond with).
+ *   - 'optional' → pass plus set-card activations you *could* use but usually
+ *                  won't (a single set trap otherwise disables auto-pass for the
+ *                  whole rest of the game — the main source of pass ceremony).
+ *   - 'none'     → a real decision (summon / attack / phase advance / pending).
+ */
+export function autoPassKind(legal: Action[]): 'forced' | 'optional' | 'none' {
+  if (!legal.some((a) => a.type === 'pass')) return 'none';
+  const others = legal.filter((a) => a.type !== 'pass');
+  if (others.length === 0) return 'forced';
+  // In a pass window the only non-pass options are set-card activations; guard
+  // anyway so a future response action can't get silently auto-passed away.
+  if (others.every((a) => a.type === 'castSpell' && a.source.from === 'zone')) return 'optional';
+  return 'none';
 }

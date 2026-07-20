@@ -8,7 +8,7 @@
 // the human (summoned face-up, flipped, revived) — attacks/combat name the
 // monster involved. Unknown/hidden uids fall back to "a monster".
 
-import type { GameEvent, HandResult, PlayerId } from '@house-rules/engine';
+import { describeEffect, type GameEvent, type HandResult, type PlayerId } from '@house-rules/engine';
 import { AI, HUMAN } from './GameSession.js';
 
 export const PLAYER_NAMES: Record<PlayerId, string> = { 0: 'You', 1: 'Riley' };
@@ -35,15 +35,13 @@ function cardList(ids: unknown): string {
   return Array.isArray(ids) ? ids.map(cardName).join(', ') : '';
 }
 
-const EFFECT_NAMES: Record<string, string> = {
-  'J-rank': 'J rank: destroy',
-  'Q-rank': 'Q rank: buff',
-  'K-rank': 'K rank: weaken',
-  negate: '♠ negate',
-  revive: '♥ revive',
-  snipe: '♣ snipe',
-  poly: '♦ Polymerization',
-};
+function effectDisplayName(id: string): string {
+  try {
+    return describeEffect(id).name;
+  } catch {
+    return id;
+  }
+}
 
 export function describeEvent(e: GameEvent, resolve?: UidResolver): string {
   const p = who(e);
@@ -103,7 +101,7 @@ export function describeEvent(e: GameEvent, resolve?: UidResolver): string {
     case 'MonsterFlipped':
       return `${cardName(e.cardId)} is flipped face-up${e.by ? ` (by ${String(e.by)})` : ''}.`;
     case 'FlipTriggered':
-      return `${cardName(e.cardId)} flip effect triggers (${String(e.effectRank)}).`;
+      return `${cardName(e.cardId)} flip effect triggers (${describeEffect(String(e.effect)).name}).`;
     case 'PositionChanged':
       return `${poss(e)} monster switches to ${String(e.position)}.`;
     case 'CombatResolved':
@@ -134,6 +132,18 @@ export function describeEvent(e: GameEvent, resolve?: UidResolver): string {
       return `${p} decline${s(e)} the bank trigger.`;
     case 'HandRevealed':
       return `${poss(e)} hand is revealed: ${cardList(e.cardIds)}.`;
+    case 'DeckPeeked':
+      return e.player === HUMAN
+        ? `You peek at the top ${String(e.count)} cards of your deck.`
+        : `Riley peeks at the top ${String(e.count)} cards of the deck.`;
+    case 'DeckRearranged':
+      return `${p} rearrange${s(e)} the top of the deck.`;
+    case 'CardRecovered':
+      return e.player === HUMAN
+        ? `You scavenge ${cardName(e.cardId)} back from the graveyard.`
+        : `Riley scavenges ${cardName(e.cardId)} back from the graveyard.`;
+    case 'CombatSurvived':
+      return `${cardName(e.cardId)} SURVIVES the combat (Doorstop)!`;
     case 'PowerChanged':
       return `A monster's power is now ${String(e.power)}${typeof e.delta === 'number' ? ` (${e.delta > 0 ? '+' : ''}${e.delta})` : ''}.`;
     case 'PolyStarted':
@@ -148,6 +158,10 @@ export function describeEvent(e: GameEvent, resolve?: UidResolver): string {
       return e.targetGone
         ? `Poly stands at ${String(e.total)}, but the monster is gone.`
         : `Poly stands at ${String(e.total)} — fused!`;
+    case 'BattleReplay':
+      return `${who(e, 'attacker')} target was destroyed — Battle Replay: attack again or stop.`;
+    case 'ReplayDeclined':
+      return `${p} call${s(e)} off the attack.`;
     case 'DeckOut':
       return `${p} cannot draw — DECK OUT!`;
     case 'GameStalled':
@@ -169,7 +183,7 @@ function s(e: GameEvent, key = 'player'): string {
 }
 
 function effectName(e: GameEvent): string {
-  return EFFECT_NAMES[String(e.effect)] ?? String(e.effect);
+  return effectDisplayName(String(e.effect));
 }
 
 function amountNote(e: GameEvent): string {

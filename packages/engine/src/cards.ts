@@ -91,21 +91,13 @@ export function polyValue(rank: Rank): number {
 }
 
 /**
- * Effect resolution hook: every effect lookup goes through here so Run-mode
- * stickers (top of stickerStack overrides the default) slot in without refactor.
- * M1: stacks are always empty, so this returns the rank-default effect id.
+ * Effect resolution hook: top of the stickerStack overrides the default.
+ * Slot-AWARE lookups (a face card's rank vs suit slot) live in effects.ts
+ * (effectiveFlipEffect / effectiveSpellEffect) — this is the raw hook.
  */
 export function effectiveEffect(card: GameCard): EffectId {
   const top = card.stickerStack[card.stickerStack.length - 1];
   return top ?? `default:${card.rank}`;
-}
-
-/** The flip-effect rank a set monster resolves with (through the sticker hook). */
-export function effectiveFlipRank(card: GameCard): Rank {
-  const eff = effectiveEffect(card);
-  if (eff.startsWith('default:')) return eff.slice('default:'.length) as Rank;
-  // Sticker effects arrive in M4; until then only defaults exist.
-  throw new Error(`unknown effect id: ${eff}`);
 }
 
 /**

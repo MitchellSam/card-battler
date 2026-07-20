@@ -24,6 +24,8 @@ export interface DevSettings {
   aiDelayMs: number;
   autoPass: boolean;
   wallPunishSelector: RulesConfig['wallPunishSelector'];
+  /** Cards ante'd to public banks at start. 0 = Constructed canonical; 5 = ratified Run value. Applies on restart. */
+  ante: number;
 }
 
 export interface DevPanelProps {
@@ -128,8 +130,22 @@ export function DevPanel({ session, settings, revealAll, onChangeSettings, onTog
             <option value="attacker">attacker picks</option>
           </select>
         </label>
+        <label>
+          ante{' '}
+          <input
+            type="number"
+            min={0}
+            max={20}
+            style={{ width: 52 }}
+            value={settings.ante}
+            onChange={(e) =>
+              onChangeSettings({ ...settings, ante: Math.max(0, Math.floor(Number(e.target.value) || 0)) })
+            }
+          />{' '}
+          <span style={{ opacity: 0.7 }}>(0 = Constructed, 5 = Run)</span>
+        </label>
         <button onClick={() => decideForMe(session)}>🤖 decide for me (1 decision)</button>
-        <div style={{ opacity: 0.7 }}>agent/wall-punish apply on restart</div>
+        <div style={{ opacity: 0.7 }}>agent/wall-punish/ante apply on restart</div>
       </div>
       {revealAll && <RevealOverlay session={session} />}
     </>

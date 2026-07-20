@@ -236,10 +236,28 @@ export function defaultPendingChoice(
       }
       return best;
     }
+    case 'battleReplay':
+      // Decline the replay — equivalent to the pre-change fizzle, so battleReplay
+      // being on doesn't move sim baselines. (Bosses/search AI may use it later.)
+      return legal.find((a) => a.type === 'replayDecline') ?? legal[0]!;
     case 'flipDecision':
       // Heuristic agents always activate — preserves the pre-ratification
       // "flip always resolves" behaviour so sim baselines stay comparable.
       return ofType(legal, 'flipChoice').find((a) => a.choice === 'activate') ?? legal[0]!;
+    case 'peekArrange':
+      // Keep the peeked order — the information is the value, not the shuffle.
+      return (
+        ofType(legal, 'peekArrange').find((a) => a.order.every((x, i) => x === i)) ?? legal[0]!
+      );
+    case 'needlePick': {
+      // Discard the opponent's highest-value revealed card.
+      const options = ofType(legal, 'needlePick');
+      const hand = view.opponent.hand;
+      if (!hand) return options[0] ?? legal[0]!;
+      return options.reduce((best, a) =>
+        bankValue(hand[a.handIndex]!) > bankValue(hand[best.handIndex]!) ? a : best,
+      );
+    }
     case 'flipTarget': {
       // 2 (position-flip) / 6 (bounce): hit the opponent's biggest face-up
       // monster; fall back to anything.

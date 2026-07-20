@@ -1,7 +1,9 @@
 // Cheat Sheet modal — M3 ships a visibly-placeholder page plus the canon
 // corrections list from the M3 brief. Real content is a design-session task.
+// M4: run-mode scrawls (sheet mods, boss cheats, curses) render as crayon
+// lines at the top — config-driven, never hardcoded copy (exit criterion 6).
 
-export function CheatSheet({ onClose }: { onClose: () => void }) {
+export function CheatSheet({ scrawls = [], onClose }: { scrawls?: string[]; onClose: () => void }) {
   return (
     <div className="overlay" style={{ zIndex: 60 }} onClick={onClose}>
       <div className="paper-modal" onClick={(e) => e.stopPropagation()} style={{ width: 560 }}>
@@ -13,6 +15,19 @@ export function CheatSheet({ onClose }: { onClose: () => void }) {
             close ✕
           </button>
         </div>
+        {scrawls.length > 0 && (
+          <div style={{ margin: '10px 0 0' }}>
+            {scrawls.map((s, i) => (
+              <div
+                key={s}
+                className="marker"
+                style={{ fontSize: 18, color: 'var(--red)', transform: `rotate(${i % 2 ? 0.8 : -0.8}deg)`, marginBottom: 4 }}
+              >
+                ✎ {s}
+              </div>
+            ))}
+          </div>
+        )}
         <div
           className="marker"
           style={{

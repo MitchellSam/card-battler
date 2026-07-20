@@ -2,21 +2,10 @@
 // The reducer enforces the same predicates; tests assert every enumerated
 // action applies without throwing (random-playout smoke test).
 
-import {
-  isMonsterCard,
-  isNumberRank,
-  isSettableSpell,
-  sacrificeCost,
-} from './cards.js';
-import type {
-  Action,
-  GameCard,
-  GameState,
-  Monster,
-  PlayerId,
-  StackItem,
-  Suit,
-} from './types.js';
+import { isMonsterCard, isSettableSpell, sacrificeCost } from './cards.js';
+import { effectiveCardEffect, effectiveSuitEffect, getEffectSpec } from './effects.js';
+import { enumerateParams, type ParamContext } from './params.js';
+import type { Action, GameCard, GameState, Monster, PlayerId } from './types.js';
 
 const other = (p: PlayerId): PlayerId => (1 - p) as PlayerId;
 
@@ -30,33 +19,12 @@ function fieldMonsters(s: GameState): { player: PlayerId; zone: number; m: Monst
   return out;
 }
 
-function negatableStackItems(s: GameState): StackItem[] {
-  // ♠ counters "any card/effect on the stack": spells, jokers, flip effects.
-  // Attack declarations and internal combat steps are neither cards nor effects.
-  return s.stack.filter((i) => i.kind === 'spell' || i.kind === 'joker' || i.kind === 'flip');
-}
-
-/** M2.5 §4: an Ace discarded as Q/K fuel is 1 or 11, chosen at cast time. */
-function aceValueOptions(card: GameCard): (1 | 11 | undefined)[] {
-  return card.rank === 'A' ? [1, 11] : [undefined];
-}
-
-function suitEffectOf(suit: Suit): 'negate' | 'revive' | 'snipe' | 'poly' {
-  switch (suit) {
-    case '♠':
-      return 'negate';
-    case '♥':
-      return 'revive';
-    case '♣':
-      return 'snipe';
-    case '♦':
-      return 'poly';
-  }
-}
-
 /**
- * Enumerate every legal castSpell action for one face card from the given source.
- * Targets are chosen (and validated) at cast time; invalid-at-resolution fizzles.
+ * Enumerate every legal castSpell action for one face card from the given
+ * source. REVISION 2 (slotless): the card's sticker (or printed default) is
+ * its rank effect; the suit effect comes from the caster's Cheat Sheet. The
+ * effect's spec drives the whole param enumeration — targets are chosen (and
+ * validated) at cast time; invalid-at-resolution fizzles.
  */
 function castOptions(
   s: GameState,
@@ -65,99 +33,24 @@ function castOptions(
   source: { from: 'hand'; handIndex: number } | { from: 'zone'; zoneIndex: number },
 ): Action[] {
   const acts: Action[] = [];
-  const ps = s.players[player];
-  const all = fieldMonsters(s);
-  const ownFaceUp = all.filter((x) => x.player === player && x.m.position !== 'set');
-  const oppFaceUp = all.filter((x) => x.player !== player && x.m.position !== 'set');
-  const numberDiscards = ps.hand
-    .map((c, i) => ({ c, i }))
-    .filter(
-      ({ c, i }) =>
-        isNumberRank(c.rank) && !(source.from === 'hand' && i === source.handIndex),
-    );
-
-  // Rank effect
-  switch (card.rank) {
-    case 'J':
-      for (const t of all)
-        acts.push({ type: 'castSpell', player, source, mode: 'rank', targetMonsterUid: t.m.uid });
-      break;
-    case 'Q':
-      for (const t of ownFaceUp)
-        for (const d of numberDiscards)
-          for (const aceValue of aceValueOptions(d.c))
-            acts.push({
-              type: 'castSpell',
-              player,
-              source,
-              mode: 'rank',
-              targetMonsterUid: t.m.uid,
-              discardHandIndex: d.i,
-              ...(aceValue !== undefined ? { aceValue } : {}),
-            });
-      break;
-    case 'K':
-      for (const t of oppFaceUp)
-        for (const d of numberDiscards)
-          for (const aceValue of aceValueOptions(d.c))
-            acts.push({
-              type: 'castSpell',
-              player,
-              source,
-              mode: 'rank',
-              targetMonsterUid: t.m.uid,
-              discardHandIndex: d.i,
-              ...(aceValue !== undefined ? { aceValue } : {}),
-            });
-      break;
-  }
-
-  // Suit effect
-  const suit = card.suit;
-  if (!suit) return acts;
-  switch (suitEffectOf(suit)) {
-    case 'negate':
-      for (const item of negatableStackItems(s))
-        acts.push({ type: 'castSpell', player, source, mode: 'suit', targetStackItemId: item.id });
-      break;
-    case 'revive': {
-      const hasRoom = ps.monsters.some((m) => m === null);
-      if (!hasRoom) break;
-      for (const gp of [0, 1] as PlayerId[]) {
-        for (const gc of s.players[gp].graveyard) {
-          if (!isMonsterCard(gc)) continue;
-          for (const position of ['attack', 'defense'] as const)
-            acts.push({
-              type: 'castSpell',
-              player,
-              source,
-              mode: 'suit',
-              graveTarget: { player: gp, cardId: gc.id },
-              summonPosition: position,
-            });
-        }
-      }
-      break;
-    }
-    case 'snipe':
-      for (const tp of [0, 1] as PlayerId[]) {
-        s.players[tp].spellTraps.forEach((st, zoneIndex) => {
-          if (!st) return;
-          if (source.from === 'zone' && tp === player && zoneIndex === source.zoneIndex) return;
-          acts.push({
-            type: 'castSpell',
-            player,
-            source,
-            mode: 'suit',
-            targetSTZone: { player: tp, zoneIndex },
-          });
-        });
-      }
-      break;
-    case 'poly':
-      for (const t of ownFaceUp)
-        acts.push({ type: 'castSpell', player, source, mode: 'suit', targetMonsterUid: t.m.uid });
-      break;
+  const ctx: ParamContext = {
+    ...(source.from === 'hand' ? { excludeHandIndex: source.handIndex } : {}),
+    ...(source.from === 'zone'
+      ? { excludeSTZone: { player, zoneIndex: source.zoneIndex } }
+      : {}),
+  };
+  for (const mode of ['rank', 'suit'] as const) {
+    const effect =
+      mode === 'rank'
+        ? effectiveCardEffect(card)
+        : card.suit
+          ? effectiveSuitEffect(s.config.suitOverrides, player, card.suit)
+          : null;
+    if (!effect || effect === 'default:9' || effect === 'default:10') continue;
+    const spec = getEffectSpec(effect);
+    if (!spec) continue; // schema-only rares never enumerate
+    for (const p of enumerateParams(s, player, spec, ctx))
+      acts.push({ type: 'castSpell', player, source, mode, ...p });
   }
   return acts;
 }
@@ -302,15 +195,60 @@ export function legalActions(s: GameState, player: PlayerId): Action[] {
         acts.push({ type: 'flipChoice', player, choice: 'activate' });
         acts.push({ type: 'flipChoice', player, choice: 'decline' });
         break;
-      case 'flipTarget':
-        for (const t of fieldMonsters(s))
-          acts.push({ type: 'chooseFlipTarget', player, monsterUid: t.m.uid });
+      case 'flipTarget': {
+        // REVISION 2: the flip's effect spec drives the same param enumeration
+        // casts use — targets, discard fuel, ace values, summon positions.
+        const spec = getEffectSpec(pending.effect);
+        if (!spec) break;
+        for (const p of enumerateParams(s, player, spec)) {
+          const { targetMonsterUid, ...rest } = p;
+          acts.push({
+            type: 'chooseFlipTarget',
+            player,
+            ...(targetMonsterUid !== undefined ? { monsterUid: targetMonsterUid } : {}),
+            ...rest,
+          });
+        }
+        break;
+      }
+      case 'peekArrange': {
+        // All permutations of the peeked top cards (count ≤ 3 ⇒ ≤ 6 actions).
+        const perms = (n: number): number[][] => {
+          if (n === 1) return [[0]];
+          const out: number[][] = [];
+          for (const p of perms(n - 1))
+            for (let i = 0; i <= p.length; i++) out.push([...p.slice(0, i), n - 1, ...p.slice(i)]);
+          return out;
+        };
+        for (const order of perms(pending.count))
+          acts.push({ type: 'peekArrange', player, order });
+        break;
+      }
+      case 'needlePick':
+        s.players[other(player)].hand.forEach((_, handIndex) =>
+          acts.push({ type: 'needlePick', player, handIndex }),
+        );
         break;
       case 'interceptor':
         // M2.5 §8: defender picks which of its monsters intercepts the direct attack.
         for (const m of s.players[player].monsters)
           if (m) acts.push({ type: 'chooseInterceptor', player, monsterUid: m.uid });
         break;
+      case 'battleReplay': {
+        // Re-choose a target after the declared one left the field: any
+        // opponent monster, a direct attack if the board is now empty, or decline.
+        const opp = s.players[other(player)];
+        let hasMonsters = false;
+        opp.monsters.forEach((m, targetZone) => {
+          if (m) {
+            hasMonsters = true;
+            acts.push({ type: 'replayAttack', player, targetZone });
+          }
+        });
+        if (!hasMonsters) acts.push({ type: 'replayAttack', player, direct: true });
+        acts.push({ type: 'replayDecline', player });
+        break;
+      }
       case 'wallPunishPick':
         s.players[pending.attacker].bank.forEach((_, bankIndex) =>
           acts.push({ type: 'wallPunishPick', player, bankIndex }),

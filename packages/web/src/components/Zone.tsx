@@ -2,6 +2,7 @@
 // rotated 90°, set spells not — canon rule 4), power badge, highlight states.
 
 import type { MonsterView, SetSpellView } from '@house-rules/engine';
+import { cardTooltip, type SuitOverrides } from '../ui/cardFace.js';
 import { Card, hlClass, type Highlight } from './Card.js';
 
 interface ZoneShellProps {
@@ -79,10 +80,12 @@ export interface MonsterZoneProps {
   highlight?: Highlight;
   /** Show your own face-down set card's identity (a peel-corner peek). */
   peek?: boolean;
+  /** The duel's Cheat Sheet sticker state — keeps suit tooltips honest. */
+  suitOverrides?: SuitOverrides;
   onClick?: () => void;
 }
 
-export function MonsterZone({ zoneIndex, mine, monster, highlight, peek, onClick }: MonsterZoneProps) {
+export function MonsterZone({ zoneIndex, mine, monster, highlight, peek, suitOverrides, onClick }: MonsterZoneProps) {
   const m = monster;
   const peeking = mine && !!peek && m !== null && m.position === 'set' && m.card !== null;
   const posMark =
@@ -130,7 +133,7 @@ export function MonsterZone({ zoneIndex, mine, monster, highlight, peek, onClick
           rotated={m.position !== 'attack'}
           w={50}
           h={70}
-          title={mine && m.position === 'set' && m.card ? `your set monster: ${m.card.rank}${m.card.suit ?? ''}` : undefined}
+          title={mine && m.position === 'set' && m.card ? `Your set monster — ${cardTooltip(m.card, suitOverrides)}` : undefined}
           style={peeking ? { opacity: 0.72, filter: 'sepia(0.35)' } : undefined}
         />
       ) : undefined}
@@ -162,10 +165,12 @@ export interface STZoneProps {
   slot: SetSpellView | null;
   highlight?: Highlight;
   peek?: boolean;
+  /** The duel's Cheat Sheet sticker state — keeps suit tooltips honest. */
+  suitOverrides?: SuitOverrides;
   onClick?: () => void;
 }
 
-export function STZone({ zoneIndex, mine, slot, highlight, peek, onClick }: STZoneProps) {
+export function STZone({ zoneIndex, mine, slot, highlight, peek, suitOverrides, onClick }: STZoneProps) {
   const peeking = mine && !!peek && slot !== null && slot.card !== null;
   return (
     <ZoneShell
@@ -182,7 +187,7 @@ export function STZone({ zoneIndex, mine, slot, highlight, peek, onClick }: STZo
           faceDown={!peeking}
           w={50}
           h={70}
-          title={mine && slot.card ? `your set spell/trap: ${slot.card.rank}${slot.card.suit ?? ''}` : undefined}
+          title={mine && slot.card ? `Your set spell/trap — ${cardTooltip(slot.card, suitOverrides)}` : undefined}
           style={peeking ? { opacity: 0.72, filter: 'sepia(0.35)' } : undefined}
         />
       ) : undefined}

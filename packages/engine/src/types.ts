@@ -54,6 +54,8 @@ export interface Monster {
   setTurn?: number; // turn it was set face-down (manual flip is illegal that turn)
   attackedTurn: number; // -1 = never
   posChangedTurn: number; // -1 = never (manual position change once per turn)
+  /** Doorstop sticker: cannot be destroyed by combat while this equals the current turn. */
+  combatImmuneTurn?: number;
 }
 
 export interface SetSpell {
@@ -89,7 +91,8 @@ export type StackItem =
       kind: 'spell';
       controller: PlayerId;
       card: GameCard;
-      effect: SpellEffectKey;
+      /** REVISION 2: always an EffectId ('default:J', 'default:♦', 'peek', …). */
+      effect: EffectId;
       targetMonsterUid?: number;
       targetStackItemId?: number;
       targetSTZone?: { player: PlayerId; zoneIndex: number };
@@ -103,8 +106,15 @@ export type StackItem =
       kind: 'flip';
       controller: PlayerId;
       monsterUid: number;
-      effectRank: Rank; // resolved through effectiveEffect at trigger time
-      targetMonsterUid?: number; // for 2 / 6
+      effect: EffectId; // resolved through effectiveFlipEffect at trigger time ('default:<rank>' or a sticker id)
+      // REVISION 2 (context-free effects): a flip may carry the same params a
+      // cast does — targets picked / fuel paid via the flipTarget pending.
+      targetMonsterUid?: number;
+      targetStackItemId?: number;
+      targetSTZone?: { player: PlayerId; zoneIndex: number };
+      graveTarget?: { player: PlayerId; cardId: string };
+      summonPosition?: 'attack' | 'defense';
+      amount?: number; // fuel value (Q/K discard; Leverage flat 3)
     }
   | {
       id: number;
@@ -132,14 +142,24 @@ export type Pending =
   | { type: 'bankTrigger'; player: PlayerId; remaining: number }
   // Ratified (2026-07): a triggering flip effect is declinable — the monster's
   // controller chooses to activate or skip it before it reaches the stack.
-  | { type: 'flipDecision'; player: PlayerId; sourceUid: number; effectRank: Rank }
-  | { type: 'flipTarget'; player: PlayerId; stackItemId: number; effectRank: '2' | '6' }
+  | { type: 'flipDecision'; player: PlayerId; sourceUid: number; effect: EffectId }
+  // Target pick for targeted flip effects: default 2/6 (any monster) and the
+  // warning-shot sticker (an opposing face-down monster).
+  | { type: 'flipTarget'; player: PlayerId; stackItemId: number; effect: EffectId }
+  // Peek sticker: controller reorders the top `count` cards of their own deck
+  // (viewFor exposes them to the controller only, via SideView.deckTop).
+  | { type: 'peekArrange'; player: PlayerId; count: number }
+  // Needle sticker: opponent's hand was revealed; controller picks 1 to discard.
+  | { type: 'needlePick'; player: PlayerId }
   | { type: 'wallPunishPick'; player: PlayerId; attacker: PlayerId }
   | { type: 'polyAce'; player: PlayerId }
   | { type: 'polyHitStand'; player: PlayerId }
   // M2.5 §8: several monsters appeared under a resolving direct attack — the
   // defender chooses which one intercepts.
-  | { type: 'interceptor'; player: PlayerId; attackerUid: number; attacker: PlayerId };
+  | { type: 'interceptor'; player: PlayerId; attackerUid: number; attacker: PlayerId }
+  // Playtest-1: the attack's declared target left the field before it resolved;
+  // the attacker (player) re-chooses a target, attacks directly, or declines.
+  | { type: 'battleReplay'; player: PlayerId; attackerUid: number };
 
 export interface PolyState {
   caster: PlayerId;
@@ -150,7 +170,33 @@ export interface PolyState {
   cardIds: string[]; // drawn so far (already moved to caster's graveyard)
 }
 
+/**
+ * M4 A2: the per-player config overlay (asymmetric rules — ratified IN).
+ * These five fields may differ per seat; ALL engine reads of them go through
+ * cfg()/cfgFor(). Everything else in RulesConfig stays symmetric.
+ */
+export type PerPlayerFields = Pick<
+  RulesConfig,
+  'drawPerTurn' | 'ante' | 'handLimit' | 'startingHand' | 'monsterZones'
+>;
+
 export interface RulesConfig {
+  /**
+   * M4 A2: per-seat deltas layered over the shared config (boss cheats,
+   * asymmetric favors). Absent/null = identical to the shared value. PUBLIC
+   * information: viewFor exposes both sides' overrides — boss cheats must be
+   * visible (hidden cheating is off-theme and off-spec).
+   */
+  overrides?: [Partial<PerPlayerFields> | null, Partial<PerPlayerFields> | null];
+  /**
+   * REVISION 2: Cheat Sheet suit stickers, per seat — a sticker over a suit's
+   * printed entry replaces that suit's spell for THAT PLAYER's casts only
+   * (ratified: asymmetric). PUBLIC, like overrides.
+   */
+  suitOverrides?: [
+    Partial<Record<Suit, EffectId>> | null,
+    Partial<Record<Suit, EffectId>> | null,
+  ];
   handLimit: number;
   startingHand: number;
   monsterZones: number;
@@ -190,6 +236,16 @@ export interface RulesConfig {
    */
   ante: number;
   /**
+   * Playtest-1 (2026-07): YGO-style Battle Replay. When an attack's declared
+   * target leaves the field before the attack resolves (e.g. destroyed by a
+   * spell during the response window), the attacker chooses a new target,
+   * attacks directly if the board is now empty, or declines — instead of the
+   * attack fizzling. false = pre-change behaviour (fizzle), kept for sim
+   * comparison / Constructed until re-sim ratifies. Only the declared TARGET
+   * leaving triggers a replay; an attacker that leaves still fizzles (M2.5 §12).
+   */
+  battleReplay: boolean;
+  /**
    * Sim-safety valve AND degeneracy detector: when a turn rollover would push
    * state.turn past this, the game ends immediately by normal showdown with
    * result.stalled = true and a GameStalled event.
@@ -216,6 +272,7 @@ export const DEFAULT_CONFIG: RulesConfig = {
   firstTurnBattle: false,
   firstTurnDraw: false,
   ante: 0,
+  battleReplay: true,
   maxTurns: 300,
 };
 
@@ -302,9 +359,28 @@ export type Action =
       bankIndex?: number;
     }
   | { type: 'flipChoice'; player: PlayerId; choice: 'activate' | 'decline' }
-  | { type: 'chooseFlipTarget'; player: PlayerId; monsterUid: number }
+  // REVISION 2: flip effects may need the full cast-style param set (targets,
+  // discard fuel, ace value, summon position) — all optional, spec-driven.
+  | {
+      type: 'chooseFlipTarget';
+      player: PlayerId;
+      monsterUid?: number;
+      targetStackItemId?: number;
+      targetSTZone?: { player: PlayerId; zoneIndex: number };
+      graveTarget?: { player: PlayerId; cardId: string };
+      summonPosition?: 'attack' | 'defense';
+      discardHandIndex?: number;
+      aceValue?: 1 | 11;
+    }
   | { type: 'chooseInterceptor'; player: PlayerId; monsterUid: number }
+  | { type: 'replayAttack'; player: PlayerId; targetZone?: number; direct?: boolean }
+  | { type: 'replayDecline'; player: PlayerId }
   | { type: 'wallPunishPick'; player: PlayerId; bankIndex: number }
+  // Peek sticker: order[i] = current index (0 = top) of the card that ends up
+  // at position i from the top. Must be a permutation of 0..count-1.
+  | { type: 'peekArrange'; player: PlayerId; order: number[] }
+  // Needle sticker: index into the opponent's (revealed) hand to discard.
+  | { type: 'needlePick'; player: PlayerId; handIndex: number }
   | { type: 'polyHit'; player: PlayerId }
   | { type: 'polyStand'; player: PlayerId }
   | { type: 'polyAce'; player: PlayerId; value: 1 | 11 };
@@ -351,6 +427,10 @@ export interface GameEvent {
     | 'BankCardRemoved'
     | 'BankTriggerDeclined'
     | 'HandRevealed'
+    | 'DeckPeeked'
+    | 'DeckRearranged'
+    | 'CardRecovered'
+    | 'CombatSurvived'
     | 'PowerChanged'
     | 'PolyStarted'
     | 'PolyCardDrawn'
@@ -358,6 +438,8 @@ export interface GameEvent {
     | 'PolyBust'
     | 'PolyStand'
     | 'AttackIntercepted'
+    | 'BattleReplay'
+    | 'ReplayDeclined'
     | 'DeckOut'
     | 'GameStalled'
     | 'GameEnded';

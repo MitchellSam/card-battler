@@ -2,7 +2,7 @@
 // first — the header says so on screen), controller color-coded, targets
 // named. Visible whenever the stack is non-empty.
 
-import type { PlayerView, StackItem } from '@house-rules/engine';
+import { describeEffect, type PlayerView, type StackItem } from '@house-rules/engine';
 import { faceOf, faceLabel, type CardFace } from '../ui/cardFace.js';
 import { PLAYER_NAMES } from '../session/describeEvent.js';
 import { HUMAN } from '../session/GameSession.js';
@@ -19,16 +19,6 @@ function monsterName(view: PlayerView, uid: number | undefined): string {
   return 'a departed monster';
 }
 
-const EFFECT_LABELS: Record<string, string> = {
-  'J-rank': 'rank: DESTROY',
-  'Q-rank': 'rank: BUFF',
-  'K-rank': 'rank: WEAKEN',
-  negate: 'suit: NEGATE ♠',
-  revive: 'suit: REVIVE ♥',
-  snipe: 'suit: SNIPE ♣',
-  poly: 'suit: POLY ♦',
-};
-
 function itemFace(item: StackItem): CardFace | null {
   if (item.kind === 'spell' || item.kind === 'joker') return faceOf(item.card);
   return null;
@@ -37,7 +27,7 @@ function itemFace(item: StackItem): CardFace | null {
 function itemText(item: StackItem, view: PlayerView): string {
   switch (item.kind) {
     case 'spell': {
-      const eff = EFFECT_LABELS[item.effect] ?? item.effect;
+      const eff = describeEffect(item.effect).name;
       const target =
         item.targetMonsterUid !== undefined
           ? ` → ${monsterName(view, item.targetMonsterUid)}`
@@ -54,7 +44,7 @@ function itemText(item: StackItem, view: PlayerView): string {
     case 'joker':
       return 'Joker — draw 2';
     case 'flip':
-      return `flip effect (${item.effectRank}) of ${monsterName(view, item.monsterUid)}${
+      return `flip effect (${describeEffect(item.effect).name}) of ${monsterName(view, item.monsterUid)}${
         item.targetMonsterUid !== undefined ? ` → ${monsterName(view, item.targetMonsterUid)}` : ''
       }`;
     case 'attack':

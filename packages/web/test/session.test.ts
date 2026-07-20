@@ -13,7 +13,7 @@ import {
 } from '@house-rules/engine';
 import { agentSeed, getAgent } from '@house-rules/sim/browser';
 import { playGame } from '@house-rules/sim';
-import { AI, GameSession, HUMAN, type Replay } from '../src/session/GameSession.js';
+import { AI, GameSession, HUMAN, autoPassKind, type Replay } from '../src/session/GameSession.js';
 import { candidatesFor, nextStep } from '../src/interact/cascade.js';
 import { describeEvent } from '../src/session/describeEvent.js';
 
@@ -71,6 +71,24 @@ describe('GameSession', () => {
       expect(rerun.phase).toBe('gameOver');
       expect(rerun.result).toEqual(result); // determinism survives the UI layer
     }
+  });
+
+  it('StrictMode double-mount: dispose() then activate() leaves a working session', () => {
+    // React StrictMode (dev) runs effect cleanup+setup twice on mount, so the
+    // owner's `return () => session.dispose()` fires once before the session
+    // is ever used. This was the "no button works until I restart" bug.
+    const session = new GameSession(7, { ...SYNC, autoPassRespondMs: 0 });
+    session.dispose(); // StrictMode's simulated unmount
+    session.activate(); // the remount's effect setup
+    // The session must drive itself back to a live human decision point…
+    expect(session.actor()).toBe(HUMAN);
+    const legal = session.legal();
+    expect(legal.length).toBeGreaterThan(0);
+    // …and accept dispatches (this threw 'session disposed' before the fix).
+    expect(() => session.dispatch(legal[0]!)).not.toThrow();
+    // activate() on a live session is a no-op.
+    session.activate();
+    expect(session.legal().length).toBeGreaterThan(0);
   });
 
   it('dispatch rejects actions when it is not the human decision point', () => {
@@ -132,6 +150,31 @@ describe('GameSession', () => {
       expect(line.length).toBeGreaterThan(0);
       expect(line).not.toMatch(/undefined|\[object/);
     }
+  });
+
+  describe('autoPassKind (smarter auto-pass classification)', () => {
+    const pass: Action = { type: 'pass', player: HUMAN };
+    const setActivation: Action = {
+      type: 'castSpell', player: HUMAN, source: { from: 'zone', zoneIndex: 0 }, mode: 'suit',
+    };
+    const handCast: Action = {
+      type: 'castSpell', player: HUMAN, source: { from: 'hand', handIndex: 0 }, mode: 'rank',
+    };
+
+    it('forced: pass is the only option → auto-pass (nothing to respond with)', () => {
+      expect(autoPassKind([pass])).toBe('forced');
+    });
+    it('optional: pass + a set-card response → interruptible auto-pass', () => {
+      // a single set trap otherwise disables auto-pass for the rest of the game
+      expect(autoPassKind([pass, setActivation])).toBe('optional');
+    });
+    it('none: no pass means a real decision point (own main phase)', () => {
+      expect(autoPassKind([{ type: 'nextPhase', player: HUMAN }])).toBe('none');
+    });
+    it('none: a non-response action alongside pass is never auto-passed', () => {
+      // guard: only set-card activations count as "responses"
+      expect(autoPassKind([pass, handCast])).toBe('none');
+    });
   });
 });
 

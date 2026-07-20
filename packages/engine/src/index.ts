@@ -15,7 +15,6 @@ export {
   SUITS,
   createDeck,
   effectiveEffect,
-  effectiveFlipRank,
   effectivePower,
   isMonsterCard,
   isNumberRank,
@@ -27,6 +26,22 @@ export {
   sacrificeCost,
   suitWeight,
 } from './cards.js';
+export {
+  EFFECT_SPECS,
+  canApplySticker,
+  describeEffect,
+  effectiveCardEffect,
+  effectiveFlipEffect,
+  effectiveSuitEffect,
+  getEffectSpec,
+  isCatalogSticker,
+  type EffectDescription,
+  type EffectSpec,
+  type EffectTier,
+  type TargetKind,
+} from './effects.js';
+export { enumerateParams, validateParams, type EffectParams, type ParamContext } from './params.js';
+export { cfg, cfgFor } from './config.js';
 export { setupGame, type SetupOptions } from './setup.js';
 export { applyAction } from './reducer.js';
 export { legalActions, hasAnyActivation } from './legal.js';

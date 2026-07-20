@@ -244,6 +244,7 @@ function FieldRow({
             monster={m}
             highlight={hl}
             peek={mine}
+            suitOverrides={view.suitOverrides}
             onClick={hl ? () => onCell(cell) : undefined}
           />
         );
@@ -263,6 +264,7 @@ function FieldRow({
             slot={st}
             highlight={hl}
             peek={mine}
+            suitOverrides={view.suitOverrides}
             onClick={hl ? () => onCell(cell) : undefined}
           />
         );
@@ -367,7 +369,7 @@ export function Board({ view, highlights, onCell, onOpenPile, center }: BoardPro
                 w={72}
                 h={100}
                 highlight={hl}
-                title={cardTooltip({ rank: c.rank, suit: c.suit })}
+                title={cardTooltip(c, view.suitOverrides)}
                 onClick={hl ? () => onCell(cell) : undefined}
               />
             </div>

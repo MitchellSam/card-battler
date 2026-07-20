@@ -1,4 +1,5 @@
 import { createDeck } from './cards.js';
+import { cfgFor } from './config.js';
 import { shuffle, type SeededRNG } from './rng.js';
 import {
   DEFAULT_CONFIG,
@@ -30,10 +31,11 @@ export interface SetupOptions {
  * an ante'd Joker is shuffled back and a different card is ante'd.
  */
 export function performAnte(state: GameState, rng: SeededRNG, events: GameEvent[]): void {
-  if (state.config.ante <= 0) return;
   for (const p of [0, 1] as PlayerId[]) {
+    const ante = cfgFor(state.config, p, 'ante');
+    if (ante <= 0) continue;
     const ps = state.players[p];
-    for (let i = 0; i < state.config.ante; i++) {
+    for (let i = 0; i < ante; i++) {
       let card = ps.deck.shift();
       while (card && card.rank === 'JOKER') {
         ps.deck.push(card);
@@ -51,11 +53,11 @@ export function performAnte(state: GameState, rng: SeededRNG, events: GameEvent[
   }
 }
 
-function emptyPlayer(config: RulesConfig, deck: GameCard[]): PlayerState {
+function emptyPlayer(config: RulesConfig, player: PlayerId, deck: GameCard[]): PlayerState {
   return {
     deck,
     hand: [],
-    monsters: Array.from({ length: config.monsterZones }, () => null),
+    monsters: Array.from({ length: cfgFor(config, player, 'monsterZones') }, () => null),
     spellTraps: Array.from({ length: config.spellTrapZones }, () => null),
     graveyard: [],
     bank: [],
@@ -83,7 +85,7 @@ export function setupGame(
     firstPlayer,
     activePlayer: firstPlayer,
     phase: options.skipMulligan ? 'main1' : 'mulligan',
-    players: [emptyPlayer(config, decks[0]), emptyPlayer(config, decks[1])],
+    players: [emptyPlayer(config, 0, decks[0]), emptyPlayer(config, 1, decks[1])],
     stack: [],
     priority: firstPlayer,
     passes: 0,
@@ -98,7 +100,7 @@ export function setupGame(
 
   for (const p of [0, 1] as PlayerId[]) {
     const ps = state.players[p];
-    const drawn = ps.deck.splice(0, config.startingHand);
+    const drawn = ps.deck.splice(0, cfgFor(config, p, 'startingHand'));
     ps.hand.push(...drawn);
     if (options.skipMulligan) ps.mulliganed = true;
     events.push({ type: 'CardsDrawn', player: p, count: drawn.length, cardIds: drawn.map((c) => c.id) });
@@ -112,7 +114,7 @@ export function setupGame(
     // knob restores it (deck is always deep enough here to draw safely).
     if (config.firstTurnDraw) {
       const ps = state.players[firstPlayer];
-      const drawn = ps.deck.splice(0, config.drawPerTurn);
+      const drawn = ps.deck.splice(0, cfgFor(config, firstPlayer, 'drawPerTurn'));
       ps.hand.push(...drawn);
       if (drawn.length > 0)
         events.push({ type: 'CardsDrawn', player: firstPlayer, count: drawn.length, cardIds: drawn.map((c) => c.id) });

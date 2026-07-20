@@ -5,7 +5,7 @@
 // actorFor). Zero rules logic lives here.
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { Action, GameCard, PlayerId } from '@house-rules/engine';
+import { describeEffect, type Action, type GameCard, type PlayerId, type RulesConfig } from '@house-rules/engine';
 import {
   applyChoice,
   handOrigins,
@@ -16,7 +16,7 @@ import {
   type Step,
   type VerbKey,
 } from './interact/cascade.js';
-import { actionSummary } from './interact/summary.js';
+import { actionSummary, selfTargetWarning } from './interact/summary.js';
 import { AI, GameSession, HUMAN } from './session/GameSession.js';
 import { PLAYER_NAMES } from './session/describeEvent.js';
 import { faceFromId, faceLabel, faceOf } from './ui/cardFace.js';
@@ -44,11 +44,15 @@ function useStageScale(): number {
 }
 
 function makeSession(seed: number, s: DevSettings): GameSession {
+  // Accumulate a single config override — a second `config` spread would clobber the first.
+  const config: Partial<RulesConfig> = {};
+  if (s.wallPunishSelector !== 'random') config.wallPunishSelector = s.wallPunishSelector;
+  if (s.ante !== 0) config.ante = s.ante;
   return new GameSession(seed, {
     agentName: s.agentName,
     aiDelayMs: s.aiDelayMs,
     autoPass: s.autoPass,
-    ...(s.wallPunishSelector !== 'random' ? { config: { wallPunishSelector: s.wallPunishSelector } } : {}),
+    ...(Object.keys(config).length ? { config } : {}),
   });
 }
 
@@ -57,12 +61,26 @@ const DEFAULT_SETTINGS: DevSettings = {
   aiDelayMs: 400,
   autoPass: true,
   wallPunishSelector: 'random',
+  ante: 5,
 };
 
-export function App() {
+export interface DuelScreenProps {
+  session: GameSession;
+  /** Run mode: cheat-sheet scrawls (sheet mods, boss cheat, curses) shown on this duel. */
+  scrawls?: string[];
+  /** Overlay rendered when the duel ends (constructed: EndScreen; run: continue note). */
+  endOverlay?: React.ReactNode;
+  /** Extra chrome (dev panel) rendered inside the stage wrap. */
+  extra?: React.ReactNode;
+}
+
+/**
+ * The duel screen (M3's App, made embeddable for M4 run mode). The session is
+ * OWNED by the caller — ConstructedApp for sandbox duels, RunShell for run
+ * duels built from a DuelSpec.
+ */
+export function DuelScreen({ session, scrawls = [], endOverlay = null, extra = null }: DuelScreenProps) {
   const scale = useStageScale();
-  const [settings, setSettings] = useState<DevSettings>(DEFAULT_SETTINGS);
-  const [session, setSession] = useState(() => makeSession(Date.now() % 100_000_000, DEFAULT_SETTINGS));
   const version = useSyncExternalStore(
     useCallback((cb: () => void) => session.subscribe(cb), [session]),
     () => session.version,
@@ -74,10 +92,11 @@ export function App() {
   // Confirm click (no board action ever fires straight from a click).
   const [confirm, setConfirm] = useState<Action | null>(null);
   const [msel, setMsel] = useState<Set<number>>(new Set()); // mulligan multi-select
+  const [peekOrder, setPeekOrder] = useState<number[]>([]); // peekArrange build-up
+  const [flipSel, setFlipSel] = useState<number | null>(null); // flipTarget two-phase (target → fuel)
   const [bankSub, setBankSub] = useState<'bank' | 'remove' | null>(null);
   const [pileOpen, setPileOpen] = useState<PileId | null>(null);
   const [cheatOpen, setCheatOpen] = useState(false);
-  const [revealAll, setRevealAll] = useState(false);
 
   // Any engine state change invalidates in-flight selections.
   const lastVersion = useRef(version);
@@ -88,32 +107,22 @@ export function App() {
       setConfirm(null);
       setBankSub(null);
       setMsel(new Set());
+      setPeekOrder([]);
+      setFlipSel(null);
     }
   }, [version]);
-
-  useEffect(() => () => session.dispose(), [session]);
 
   const view = session.humanView();
   const legal = useMemo(() => session.legal(), [session, version]);
   const actor = session.actor();
   const over = session.isOver();
 
-  const restart = useCallback(
-    (seed: number) => {
-      session.dispose();
-      setSession(makeSession(seed, settings));
-      setSel(null);
-      setConfirm(null);
-      setBankSub(null);
-      setMsel(new Set());
-      setPileOpen(null);
-    },
-    [session, settings],
-  );
-
   const dispatch = useCallback(
     (action: Action | undefined) => {
-      if (action) session.dispatch(action);
+      // Drop clicks that land while the AI still holds the decision point
+      // (e.g. clicking KEEP ALL before Riley's mulligan beat resolves) —
+      // throwing from an onClick just eats the click and logs an error.
+      if (action && !session.isOver() && session.actor() === HUMAN) session.dispatch(action);
     },
     [session],
   );
@@ -174,9 +183,9 @@ export function App() {
           break;
         case 'flipTarget':
           for (const a of legal)
-            if (a.type === 'chooseFlipTarget') {
+            if (a.type === 'chooseFlipTarget' && a.monsterUid !== undefined) {
               const c = monsterCellByUid(a.monsterUid);
-              if (c) put(c, 'target');
+              if (c) put(c, flipSel === a.monsterUid ? 'sel' : 'target');
             }
           break;
         case 'interceptor':
@@ -185,6 +194,11 @@ export function App() {
               const c = monsterCellByUid(a.monsterUid);
               if (c) put(c, 'target');
             }
+          break;
+        case 'battleReplay':
+          for (const a of legal)
+            if (a.type === 'replayAttack' && a.targetZone !== undefined)
+              put({ t: 'oppMonster', zone: a.targetZone }, 'target');
           break;
         case 'wallPunishPick':
           for (const a of legal)
@@ -318,8 +332,12 @@ export function App() {
             return;
           case 'flipTarget': {
             const uid = uidAtCell(cell);
-            if (uid !== null)
-              dispatch(legal.find((a) => a.type === 'chooseFlipTarget' && a.monsterUid === uid));
+            if (uid === null) return;
+            const matches = legal.filter(
+              (a) => a.type === 'chooseFlipTarget' && a.monsterUid === uid,
+            );
+            if (matches.length === 1) dispatch(matches[0]);
+            else if (matches.length > 1) setFlipSel(uid); // fuel/param variants → note buttons
             return;
           }
           case 'interceptor': {
@@ -328,6 +346,10 @@ export function App() {
               dispatch(legal.find((a) => a.type === 'chooseInterceptor' && a.monsterUid === uid));
             return;
           }
+          case 'battleReplay':
+            if (cell.t === 'oppMonster')
+              dispatch(legal.find((a) => a.type === 'replayAttack' && a.targetZone === cell.zone));
+            return;
           case 'wallPunishPick':
             if (cell.t === 'myBank' || cell.t === 'oppBank')
               dispatch(legal.find((a) => a.type === 'wallPunishPick' && a.bankIndex === cell.i));
@@ -393,16 +415,27 @@ export function App() {
   function buildPrompt(): React.ReactNode {
     if (over) return null;
 
-    // Confirm-first: a parked action awaits an explicit Confirm click.
+    // Confirm-first: a parked action awaits an explicit Confirm click. Every
+    // spell/attack routes through here, so this popup is the universal cancel.
     if (confirm) {
+      const warn = selfTargetWarning(confirm, view, (uid) => session.uidName(uid));
       return (
         <PromptNote
           title="✔ CONFIRM"
-          body={actionSummary(confirm, view, (uid) => session.uidName(uid))}
+          body={
+            <>
+              {actionSummary(confirm, view, (uid) => session.uidName(uid))}
+              {warn && (
+                <div className="marker" style={{ color: 'var(--red)', marginTop: 6 }}>
+                  ⚠ {warn}
+                </div>
+              )}
+            </>
+          }
           buttons={[
             {
-              label: 'CONFIRM',
-              tone: 'green',
+              label: warn ? '⚠ CONFIRM ANYWAY' : 'CONFIRM',
+              tone: warn ? 'red' : 'green',
               onClick: () => {
                 const a = confirm;
                 setConfirm(null);
@@ -454,7 +487,7 @@ export function App() {
           return (
             <PromptNote
               title="⚡ FLIP EFFECT?"
-              body={`${uidFaceLabel(humanPending.sourceUid)} flipped up — use its "${humanPending.effectRank}" effect?`}
+              body={`${uidFaceLabel(humanPending.sourceUid)} flipped up — use its "${describeEffect(humanPending.effect).name}" effect?`}
               buttons={[
                 {
                   label: 'ACTIVATE',
@@ -468,10 +501,79 @@ export function App() {
               ]}
             />
           );
-        case 'flipTarget':
+        case 'flipTarget': {
+          // REVISION 2: any effect can be a flip effect — some need fuel or
+          // non-monster targets, offered as buttons (cast-style params).
+          const opts = legal.filter(
+            (a): a is Extract<Action, { type: 'chooseFlipTarget' }> =>
+              a.type === 'chooseFlipTarget',
+          );
+          const label = (a: Extract<Action, { type: 'chooseFlipTarget' }>): string => {
+            const parts: string[] = [];
+            if (a.targetStackItemId !== undefined) parts.push(`stack #${a.targetStackItemId}`);
+            if (a.targetSTZone)
+              parts.push(`${a.targetSTZone.player === HUMAN ? 'your' : "Riley's"} S${a.targetSTZone.zoneIndex + 1}`);
+            if (a.graveTarget)
+              parts.push(`${faceLabel(faceFromId(a.graveTarget.cardId))}${a.summonPosition ? ` (${a.summonPosition})` : ''}`);
+            if (a.discardHandIndex !== undefined) {
+              const c = view.you.hand?.[a.discardHandIndex];
+              parts.push(`discard ${c ? faceLabel(faceOf(c)) : '?'}${a.aceValue ? ` as ${a.aceValue}` : ''}`);
+            }
+            return parts.join(' · ') || 'resolve';
+          };
+          const monsterTargeted = opts.some((a) => a.monsterUid !== undefined);
+          if (!monsterTargeted) {
+            return (
+              <PromptNote
+                title="⚡ FLIP EFFECT"
+                body="Pick how it resolves:"
+                buttons={opts.slice(0, 10).map((a, i) => ({
+                  label: `${i + 1}. ${label(a)}`,
+                  tone: 'blue' as const,
+                  onClick: () => dispatch(a),
+                }))}
+              />
+            );
+          }
+          if (flipSel !== null) {
+            const forTarget = opts.filter((a) => a.monsterUid === flipSel);
+            return (
+              <PromptNote
+                title="⚡ FLIP EFFECT — fuel"
+                body={`Target ${uidFaceLabel(flipSel)} — pick the cost:`}
+                buttons={[
+                  ...forTarget.slice(0, 10).map((a, i) => ({
+                    label: `${i + 1}. ${label(a)}`,
+                    tone: 'blue' as const,
+                    onClick: () => dispatch(a),
+                  })),
+                  { label: '↺ different target', onClick: () => setFlipSel(null) },
+                ]}
+              />
+            );
+          }
           return <PromptNote title="⚡ FLIP EFFECT" body="Pick a target monster (highlighted)." />;
+        }
         case 'interceptor':
           return <PromptNote title="⚡ INTERCEPT!" body="A monster appeared under the direct attack — pick which of yours intercepts." />;
+        case 'battleReplay': {
+          const direct = legal.find((a) => a.type === 'replayAttack' && a.direct);
+          const buttons: NoteButton[] = [];
+          if (direct)
+            buttons.push({ label: '💥 ATTACK DIRECTLY', tone: 'red', onClick: () => dispatch(direct) });
+          buttons.push({ label: "DON'T ATTACK", onClick: () => dispatch(legal.find((a) => a.type === 'replayDecline')) });
+          return (
+            <PromptNote
+              title="↻ BATTLE REPLAY"
+              body={
+                direct
+                  ? 'Your target was destroyed and their board is now empty — attack directly, or stop.'
+                  : 'Your target was destroyed — pick a new monster to attack (highlighted), or stop.'
+              }
+              buttons={buttons}
+            />
+          );
+        }
         case 'wallPunishPick':
           return <PromptNote title="⚡ WALL PUNISH" body={`Pick which card leaves ${humanPending.attacker === HUMAN ? 'your' : "Riley's"} bank (highlighted).`} />;
         case 'polyAce':
@@ -486,6 +588,87 @@ export function App() {
           );
         case 'polyHitStand':
           return <PolyNote />;
+        case 'peekArrange': {
+          // Sticker: Peek — order the peeked cards; first click = new top.
+          const deckTop = view.you.deckTop ?? [];
+          const done = peekOrder.length === deckTop.length;
+          const confirmAction = legal.find(
+            (a) =>
+              a.type === 'peekArrange' &&
+              a.order.length === peekOrder.length &&
+              a.order.every((x, i) => x === peekOrder[i]),
+          );
+          return (
+            <PromptNote
+              title="👀 PEEK"
+              body={
+                <>
+                  Top of your deck — click cards in the order they should sit (first click = top).
+                  <div style={{ display: 'flex', gap: 6, margin: '8px 0', flexWrap: 'wrap' }}>
+                    {deckTop.map((c, i) => {
+                      const pos = peekOrder.indexOf(i);
+                      return (
+                        <div key={c.id} style={{ position: 'relative' }}>
+                          <Card
+                            rank={c.rank}
+                            suit={c.suit}
+                            w={44}
+                            h={62}
+                            highlight={pos >= 0 ? 'sel' : 'act'}
+                            onClick={() =>
+                              setPeekOrder((prev) => (prev.includes(i) ? prev : [...prev, i]))
+                            }
+                          />
+                          {pos >= 0 && (
+                            <span
+                              className="marker"
+                              style={{ position: 'absolute', top: -8, right: -6, color: 'var(--red)', fontSize: 16 }}
+                            >
+                              {pos + 1}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              }
+              buttons={[
+                { label: 'CONFIRM ORDER', tone: 'green', disabled: !done || !confirmAction, onClick: () => dispatch(confirmAction) },
+                { label: '↺ reset', onClick: () => setPeekOrder([]) },
+              ]}
+            />
+          );
+        }
+        case 'needlePick': {
+          // Sticker: Needle — their hand is revealed; pick one to discard.
+          const oppHand = view.opponent.hand ?? [];
+          return (
+            <PromptNote
+              title="📌 NEEDLE"
+              body={
+                <>
+                  Their whole hand, face-up. Pick one card — they discard it.
+                  <div style={{ display: 'flex', gap: 6, margin: '8px 0', flexWrap: 'wrap' }}>
+                    {oppHand.map((c, i) => (
+                      <Card
+                        key={c.id}
+                        rank={c.rank}
+                        suit={c.suit}
+                        w={44}
+                        h={62}
+                        highlight="target"
+                        onClick={() =>
+                          dispatch(legal.find((a) => a.type === 'needlePick' && a.handIndex === i))
+                        }
+                      />
+                    ))}
+                  </div>
+                </>
+              }
+            />
+          );
+        }
       }
     }
 
@@ -658,7 +841,9 @@ export function App() {
           className="marker prio-pulse"
           style={{ fontSize: 15, color: '#3a2f14', background: 'var(--yellow)', borderRadius: 5, padding: '8px 16px', textAlign: 'center' }}
         >
-          nothing to respond with — auto-passing…
+          {session.autoPassRespondable
+            ? 'auto-passing — hit RESPOND to act'
+            : 'nothing to respond with — auto-passing…'}
         </div>
       ) : (
         <div
@@ -672,6 +857,11 @@ export function App() {
         </div>
       )}
       <div style={{ display: 'flex', gap: 8 }}>
+        {session.autoPassing && session.autoPassRespondable && (
+          <button className="note-btn" onClick={() => session.cancelAutoPass()} style={{ transform: 'rotate(-1deg)' }}>
+            ✋ RESPOND
+          </button>
+        )}
         {passAction && !session.autoPassing && (
           <button className="note-btn" onClick={() => dispatch(passAction)} style={{ transform: 'rotate(1deg)' }}>
             {passLabel}
@@ -722,6 +912,19 @@ export function App() {
     <div className="stage-wrap">
       <div className="stage" style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}>
         <div className="board-col">
+          {scrawls.length > 0 && (
+            <div
+              className="marker"
+              style={{ display: 'flex', gap: 18, flexWrap: 'wrap', color: 'var(--red)', fontSize: 14, padding: '2px 8px' }}
+              title="today's house rules — also on the Cheat Sheet"
+            >
+              {scrawls.map((s) => (
+                <span key={s} style={{ transform: 'rotate(-0.6deg)' }}>
+                  ✎ {s}
+                </span>
+              ))}
+            </div>
+          )}
           <PhaseStrip
             turn={view.turn}
             phase={view.phase}
@@ -755,26 +958,62 @@ export function App() {
       </div>
 
       {pileModal}
-      {cheatOpen && <CheatSheet onClose={() => setCheatOpen(false)} />}
-      {view.result && (
-        <EndScreen
-          result={view.result}
-          stats={session.stats()}
-          seed={session.seed}
-          onExportReplay={() => downloadReplay(session)}
-          onRematch={() => restart(Date.now() % 100_000_000)}
-          onReplaySameSeed={() => restart(session.seed)}
-        />
-      )}
-      <DevPanel
-        session={session}
-        settings={settings}
-        revealAll={revealAll}
-        onChangeSettings={setSettings}
-        onToggleReveal={setRevealAll}
-        onRestart={restart}
-      />
+      {cheatOpen && <CheatSheet scrawls={scrawls} onClose={() => setCheatOpen(false)} />}
+      {view.result && endOverlay}
+      {extra}
     </div>
+  );
+}
+
+/** The M3 sandbox: constructed duel vs the AI, dev panel, rematch loop. */
+export function ConstructedApp() {
+  const [settings, setSettings] = useState<DevSettings>(DEFAULT_SETTINGS);
+  const [session, setSession] = useState(() => makeSession(Date.now() % 100_000_000, DEFAULT_SETTINGS));
+  const [revealAll, setRevealAll] = useState(false);
+  // Subscribe here too: endOverlay is computed at THIS component's render.
+  useSyncExternalStore(
+    useCallback((cb: () => void) => session.subscribe(cb), [session]),
+    () => session.version,
+  );
+  // activate() undoes StrictMode's dev-mode mount→cleanup→mount dispose.
+  useEffect(() => {
+    session.activate();
+    return () => session.dispose();
+  }, [session]);
+  const restart = useCallback(
+    (seed: number) => {
+      session.dispose();
+      setSession(makeSession(seed, settings));
+    },
+    [session, settings],
+  );
+  const result = session.humanView().result;
+  return (
+    <DuelScreen
+      session={session}
+      endOverlay={
+        result ? (
+          <EndScreen
+            result={result}
+            stats={session.stats()}
+            seed={session.seed}
+            onExportReplay={() => downloadReplay(session)}
+            onRematch={() => restart(Date.now() % 100_000_000)}
+            onReplaySameSeed={() => restart(session.seed)}
+          />
+        ) : null
+      }
+      extra={
+        <DevPanel
+          session={session}
+          settings={settings}
+          revealAll={revealAll}
+          onChangeSettings={setSettings}
+          onToggleReveal={setRevealAll}
+          onRestart={restart}
+        />
+      }
+    />
   );
 }
 

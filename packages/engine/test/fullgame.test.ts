@@ -371,7 +371,7 @@ describe('full scripted game (acceptance)', () => {
     pass(0); pass(1); // combat: 10 > 9 in defense
     expect(s.players[1].monsters[0]).toBeNull();
     expect(
-      events.filter((e) => e.type === 'FlipTriggered' && (e.effectRank === '9' || e.effectRank === '10')),
+      events.filter((e) => e.type === 'FlipTriggered' && (e.effect === 'default:9' || e.effect === 'default:10')),
     ).toHaveLength(0);
     next(0); next(0);
 
@@ -418,7 +418,7 @@ describe('full scripted game (acceptance)', () => {
     // ...including one flip trigger for each effect rank that HAS an effect
     for (const rank of ['A', '2', '3', '4', '5', '6', '7', '8']) {
       expect(
-        events.some((e) => e.type === 'FlipTriggered' && e.effectRank === rank),
+        events.some((e) => e.type === 'FlipTriggered' && e.effect === `default:${rank}`),
         `expected a flip trigger for rank ${rank}`,
       ).toBe(true);
     }

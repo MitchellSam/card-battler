@@ -5,7 +5,17 @@
 // behind), the early-denial bank-trigger curve, wall-punish risk, and keeping
 // one negate set. Hand-tuned to "not obviously stupid".
 
-import { pokerRank, type Action, type GameCard, type MonsterView, type PlayerView, type SeededRNG } from '@house-rules/engine';
+import {
+  effectiveCardEffect,
+  effectiveFlipEffect,
+  effectiveSuitEffect,
+  pokerRank,
+  type Action,
+  type GameCard,
+  type MonsterView,
+  type PlayerView,
+  type SeededRNG,
+} from '@house-rules/engine';
 import type { Agent } from '../agent.js';
 import {
   bestBankHand,
@@ -75,9 +85,11 @@ function monsterAt(view: PlayerView, uid: number): { m: MonsterView; mine: boole
   return null;
 }
 
-/** Flip-effect value of a rank when it triggers under our control. */
-function flipValue(rank: string, ctx: Ctx): number {
-  switch (rank) {
+/** Flip-effect value of a card when it triggers under our control. */
+function flipValue(card: GameCard, ctx: Ctx): number {
+  const eff = effectiveFlipEffect(card);
+  if (!eff.startsWith('default:')) return 0.5; // stickers: flat mild value
+  switch (eff.slice('default:'.length)) {
     case 'A':
       return 0.5; // becomes 11 until EOT
     case '2':
@@ -102,18 +114,10 @@ function flipValue(rank: string, ctx: Ctx): number {
   }
 }
 
-function spellEffectOf(card: GameCard, mode: 'rank' | 'suit'): string {
-  if (mode === 'rank') return `${card.rank}-rank`;
-  switch (card.suit) {
-    case '♠':
-      return 'negate';
-    case '♥':
-      return 'revive';
-    case '♣':
-      return 'snipe';
-    default:
-      return 'poly';
-  }
+/** REVISION 2: the effect a cast resolves — card sticker/default or the sheet's suit entry. */
+function spellEffectOf(view: PlayerView, card: GameCard, mode: 'rank' | 'suit'): string {
+  if (mode === 'rank') return effectiveCardEffect(card);
+  return effectiveSuitEffect(view.suitOverrides, view.player, card.suit!);
 }
 
 function scoreAction(a: Action, ctx: Ctx): number {
@@ -139,7 +143,7 @@ function scoreAction(a: Action, ctx: Ctx): number {
         return score;
       }
       // set: wall + flip ambush
-      let score = net * 0.3 + flipValue(card.rank, ctx) * 0.6;
+      let score = net * 0.3 + flipValue(card, ctx) * 0.6;
       if (ctx.behind) score += 0.8; // dig in, deny triggers
       if (power <= 4) score += 0.3; // weak bodies are better face-down
       return score;
@@ -160,17 +164,17 @@ function scoreAction(a: Action, ctx: Ctx): number {
         a.source.from === 'hand'
           ? view.you.hand![a.source.handIndex]!
           : view.you.spellTraps[a.source.zoneIndex]!.card!;
-      const effect = spellEffectOf(card, a.mode);
+      const effect = spellEffectOf(view, card, a.mode);
       switch (effect) {
-        case 'J-rank': {
+        case 'default:J': {
           const t = a.targetMonsterUid !== undefined ? monsterAt(view, a.targetMonsterUid) : null;
           if (!t || t.mine) return -5;
           const tp = t.m.power ?? SET_MONSTER_EXPECTED;
           return 0.25 * tp + (tp >= ctx.oppMax && tp > 0 ? 0.4 : 0) - 1;
         }
-        case 'Q-rank':
+        case 'default:Q':
           return -0.3 + (a.discardHandIndex !== undefined ? 0 : 0); // rarely worth two cards
-        case 'K-rank': {
+        case 'default:K': {
           const t = a.targetMonsterUid !== undefined ? monsterAt(view, a.targetMonsterUid) : null;
           if (!t || t.mine) return -5;
           // M2.5 §4: an Ace discard is worth aceValue (1 or 11) at the caster's choice.
@@ -181,13 +185,13 @@ function scoreAction(a: Action, ctx: Ctx): number {
           else if (tp >= ctx.myMax && tp - amount < ctx.myMax) score += 1.2; // into kill range
           return score;
         }
-        case 'negate': {
+        case 'default:♠': {
           const item = view.stack.find((i) => i.id === a.targetStackItemId);
           if (!item || item.controller === view.player) return -5;
           const value = item.kind === 'spell' ? 1.6 : item.kind === 'joker' ? 0.9 : 1.0;
           return value - (ctx.negateSetsCount <= 1 && a.source.from === 'zone' ? 0.3 : 0);
         }
-        case 'revive': {
+        case 'default:♥': {
           const gt = a.graveTarget!;
           const gy = view[gt.player === view.player ? 'you' : 'opponent'].graveyard;
           const target = gy.find((c) => c.id === gt.cardId);
@@ -196,17 +200,22 @@ function scoreAction(a: Action, ctx: Ctx): number {
           const rightPos = a.summonPosition === (power > ctx.oppMax ? 'attack' : 'defense');
           return 0.3 * power - 0.6 + (rightPos ? 0.2 : 0);
         }
-        case 'snipe': {
+        case 'default:♣': {
           if (a.targetSTZone!.player === view.player) return -5;
           return 0.4;
         }
-        default: {
+        case 'default:♦': {
           // poly: rewrite a weak monster's power; deck depletion doubles as clock
           const t = a.targetMonsterUid !== undefined ? monsterAt(view, a.targetMonsterUid) : null;
           if (!t || !t.mine) return -5;
           const tp = t.m.power ?? 0;
           return 0.3 * (7 - tp) + (ctx.ahead ? 0.5 : -0.3) - 0.4;
         }
+        default:
+          // A sticker (or a default flip effect stuck on a face card): resolve
+          // it like a mild utility spell — worth casting when idle, never at a
+          // steep cost.
+          return 0.3 - (a.discardHandIndex !== undefined ? 0.5 : 0);
       }
     }
 
@@ -229,7 +238,7 @@ function scoreAction(a: Action, ctx: Ctx): number {
 
     case 'flipMonster': {
       const m = view.you.monsters[a.zoneIndex]!;
-      let score = flipValue(m.card!.rank, ctx);
+      let score = flipValue(m.card!, ctx);
       if ((m.power ?? 0) > ctx.oppMax) score += 0.4; // becomes a live attacker
       if (view.phase === 'main2') score -= 0.3; // ambush spent for nothing
       return score;

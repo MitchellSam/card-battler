@@ -1,6 +1,23 @@
 // Presentation helpers for card identity. Pure display parsing — never rules.
+//
+// Drift fix (REVISION 2): effect text comes from the ENGINE's registry
+// (describeEffect over the card's EFFECTIVE effect id). Slotless model: a
+// card's sticker covers its own effect (a number's flip / a face's rank
+// spell); suit spells live on the Cheat Sheet, so the tooltip shows the
+// PRINTED suit default and defers to the sheet.
 
-import type { GameCard } from '@house-rules/engine';
+import {
+  describeEffect,
+  effectiveCardEffect,
+  effectiveSuitEffect,
+  isNumberRank,
+  monsterBasePower,
+  sacrificeCost,
+  type GameCard,
+  type RulesConfig,
+} from '@house-rules/engine';
+
+export type SuitOverrides = RulesConfig['suitOverrides'];
 
 export interface CardFace {
   rank: string;
@@ -22,41 +39,35 @@ export function faceLabel(f: CardFace): string {
   return f.rank === 'JOKER' ? 'Joker' : `${f.rank}${f.suit ?? ''}`;
 }
 
-// Hover-inspect text. Facts are taken straight from the engine's effect
-// semantics (types.ts SpellEffectKey + reducer flip table + the M3 canon
-// corrections) — presentation only, never a source of rules.
-const FLIP_TEXT: Record<string, string> = {
-  A: 'power becomes 11 until end of turn',
-  '2': "flip any monster's battle position (a face-down flips up)",
-  '3': "reveal the opponent's hand",
-  '4': 'draw 1 card',
-  '5': 'mill 2 from the opponent deck',
-  '6': 'return any monster to its hand',
-  '7': 'opponent discards 1 at random',
-  '8': 'destroy every attack-position monster (both sides)',
-  '9': 'no flip effect',
-  '10': 'no flip effect',
-};
-const RANK_SPELL: Record<string, string> = {
-  J: 'destroy any one monster',
-  Q: 'discard a number card → your monster +its value (this turn)',
-  K: 'discard a number card → enemy monster −its value (permanent)',
-};
-const SUIT_SPELL: Record<string, string> = {
-  '♠': 'negate a card/effect on the stack',
-  '♥': 'revive a monster from either graveyard (no flip effect)',
-  '♣': 'destroy a set spell/trap',
-  '♦': 'Polymerization — blackjack-fuse one of your monsters',
-};
+/** Slot line: printed default plain, a covering sticker named in brackets. */
+function slotLine(label: string, card: GameCard): string {
+  const eff = effectiveCardEffect(card);
+  const d = describeEffect(eff);
+  return eff === `default:${card.rank}` ? `${label}: ${d.text}` : `${label} [${d.name}]: ${d.text}`;
+}
 
-export function cardTooltip(f: CardFace): string {
-  if (f.rank === 'JOKER') return 'Joker — draw 2 (Pot of Greed). Never bankable.';
-  const isNumber = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10'].includes(f.rank);
-  if (isNumber) {
-    const power = f.rank === 'A' ? 1 : Number(f.rank);
-    const cost = power >= 8 ? 2 : power >= 5 ? 1 : 0;
-    const costNote = cost === 0 ? 'no tribute' : `${cost} tribute`;
-    return `${faceLabel(f)} — monster · power ${power} · ${costNote}. Flip: ${FLIP_TEXT[f.rank]}.`;
+/**
+ * Hover-inspect text for a card, resolved through its EFFECTIVE effects.
+ * `suitOverrides` is the duel's Cheat Sheet sticker state (view.suitOverrides)
+ * — the suit line shows what the OWNER's cast would actually do, so a sheet
+ * sticker can never drift out of the tooltip.
+ */
+export function cardTooltip(card: GameCard, suitOverrides?: SuitOverrides): string {
+  if (card.rank === 'JOKER') {
+    return `Joker — ${describeEffect('default:JOKER').text}`;
   }
-  return `${faceLabel(f)} — spell. Rank(${f.rank}): ${RANK_SPELL[f.rank]}. Suit(${f.suit ?? ''}): ${f.suit ? SUIT_SPELL[f.suit] : ''}.`;
+  const label = faceLabel(faceOf(card));
+  if (isNumberRank(card.rank)) {
+    const power = monsterBasePower(card);
+    const cost = sacrificeCost(card);
+    const costNote = cost === 0 ? 'no tribute' : `${cost} tribute`;
+    return `${label} — monster · power ${power} · ${costNote}. ${slotLine('Flip', card)}.`;
+  }
+  const suitEff = effectiveSuitEffect(suitOverrides, card.owner, card.suit!);
+  const suitD = describeEffect(suitEff);
+  const suitLine =
+    suitEff === `default:${card.suit}`
+      ? `Suit(${card.suit}) per the Cheat Sheet: ${suitD.text}`
+      : `Suit(${card.suit}) [${suitD.name} — sheet sticker!]: ${suitD.text}`;
+  return `${label} — spell. ${slotLine(`Rank(${card.rank})`, card)}. ${suitLine}.`;
 }

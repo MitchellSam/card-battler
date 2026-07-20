@@ -9,6 +9,10 @@ house-ruling their own card game. Design docs:
 - [M2.5_IMPLEMENTATION_BRIEF.md](M2.5_IMPLEMENTATION_BRIEF.md) — ratified rules changes + re-simulation
 - [M2-FINDINGS.md](M2-FINDINGS.md) — pacing verdicts + designer decisions (M2 data + M2.5 addendum)
 - [M3_IMPLEMENTATION_BRIEF.md](M3_IMPLEMENTATION_BRIEF.md) — browser prototype (playable vs greedy AI)
+- [EFFECT_CATALOG_v1.md](EFFECT_CATALOG_v1.md) — first-pass sticker/effect catalog (commons/uncommons/rares)
+- [M4_DESIGN_RECOMMENDATIONS.md](M4_DESIGN_RECOMMENDATIONS.md) — Run-layer content + structure recommendations (ratified 2026-07-19 as the working set)
+- [M4_IMPLEMENTATION_BRIEF.md](M4_IMPLEMENTATION_BRIEF.md) — Run mode layer: effect framework, per-player config, node map, economy, persistence
+- [HANDOFF_M4.md](HANDOFF_M4.md) — implementation handoff for the M4 milestone (what shipped, what's next, gotchas)
 - [RULES-GAPS.md](RULES-GAPS.md) — generated list of open rules questions found during implementation (decide with the designers)
 
 ## Layout
@@ -25,6 +29,15 @@ npm workspaces, no monorepo tooling.
   per-game records, outlier replay capture, and a markdown report generator.
   The `@house-rules/sim/browser` subpath exports the node-free subset (agents,
   `actorFor`, `agentSeed`) for the web client.
+- `packages/run` — **M4: run-mode layer.** Pure, headless, dep-free except the
+  engine. Event-sourced run reducer (`applyRunAction`/`legalRunActions`),
+  seeded StS-style node-map generator (≥1 shop per path, no adjacent elites),
+  encounters/economy/events/sheet-mods/favors as **data files** (changing
+  content requires no code edit), grace-degraded pack tiers, discovery pool,
+  strikes, and a versioned `Storage` interface (in-memory for tests, IndexedDB
+  in web, SQLite later). Duels stay outside: `startDuel` yields a `DuelSpec`,
+  the shell plays it and feeds back `duelOutcome` — a whole run replays
+  deterministically from `runSeed` + the action log + duel outcomes.
 - `packages/web` — **M3: browser prototype** (Vite + React). Playable duel vs
   the greedy agent. The UI contains zero rules logic: every affordance is a
   filter over `legalActions()`, prompts come from `state.pending`, whose-turn
@@ -115,3 +128,50 @@ npm run gen:rules-gaps
   decide-for-me. Cheat Sheet ships as a visibly-placeholder page with the
   canon corrections list. **Remaining exit gate: the brother completes a full
   duel in-browser and the wall-clock number goes to the design chat.**
+- **M4 (run mode layer): implemented, awaiting the human full-run gate.**
+  - **A1 — effect framework, REVISION 2 (2026-07-19): slotless stickers +
+    context-free effects.** The engine owns a data-driven registry
+    (`packages/engine/src/effects.ts`): 9 catalog seed effects + all 17
+    base-game DEFAULTS as poolable stickers, name/text as THE anti-drift source
+    (`describeEffect`; the web's duplicated tables are deleted). One
+    context-free resolver serves every trigger: a sticker on a number card is
+    its flip effect, on a face card it replaces the rank spell, and suit spells
+    live on the CHEAT SHEET (`config.suitOverrides`, per player, public) —
+    stickering the sheet's ♦ replaces YOUR Polymerization. `params.ts` gives
+    casts and flips one shared target/fuel enumeration+validation (Q as a flip
+    prompts for its discard). Any sticker fits any non-Joker card. The playout
+    prober runs randomly stickered decks + random sheet overrides. Remaining
+    catalog commons/uncommons and all rares are M5.
+  - **A2 — per-player config overlay.** `RulesConfig.overrides` (per-seat
+    drawPerTurn/ante/handLimit/startingHand/monsterZones) read exclusively
+    through `cfg()`; absent = byte-identical to before; PUBLIC in `viewFor`
+    (boss cheats are visible by design). Boss "The Grown-Up" cheats via data
+    (`drawPerTurn: 3`) and the scrawl renders on the duel screen + Cheat Sheet.
+  - **Part B — `packages/run`** (see Layout). Headless full-run test: seeded
+    agents drive complete runs (map → duels/events/shops → boss → summary)
+    with REAL engine duels, deterministically.
+  - **Part C — run mode in the browser.** Account home (new/resume/wipe +
+    favor LOADOUT: favors are between-run progression, unlocked by account
+    milestones, equipped ≤2 per run — never sold in-run) → node map (DAG,
+    reachable highlighting) → duel (GameSession from the DuelSpec, stickered
+    deck, scrawls incl. sheet stickers) → shop (packs restock, pack rip =
+    pick-1-of-3 of the rolled tier, trim) → events (sticky notes) → boss
+    pick-1-of-3 → run summary + run-record export. **Every duel win offers a
+    pick-1-of-3 sticker** (drawn from ALL implemented effects, NEW-flagged;
+    picking an undiscovered one unlocks it — THE discovery channel), and the
+    apply screen targets any deck card OR a Cheat Sheet suit slot. Post-duel
+    rewards note on the map. IndexedDB persistence: reload resumes mid-run.
+    Run dev panel: seed input, jump-to-node, grant coin/sticker, force
+    win/lose duel.
+  - **Bugfixes (2026-07-20):** React StrictMode's dev double-mount was
+    disposing the freshly-created `GameSession` (dead buttons on duel entry
+    until a dev-panel restart) — fixed with `GameSession.activate()` re-armed
+    in the owner's effect setup; suit tooltips ignored Cheat Sheet stickers —
+    `cardTooltip` now reads `view.suitOverrides` (threaded through
+    Board/Zone/DeckViewer); a dispatch guard drops clicks that land while the
+    AI holds priority.
+  - **Test count: 232 green** (167 engine · 42 run · 5 sim · 18 web);
+    `npm run typecheck` clean; `npx vite build` bundles clean.
+  - **Remaining exit gate: a human completes a full run start-to-finish in the
+    browser** (the headless equivalent is green in
+    `packages/run/test/fullrun.test.ts`).

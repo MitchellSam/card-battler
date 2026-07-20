@@ -9,6 +9,7 @@ import type {
   GameState,
   Monster,
   Pending,
+  PerPlayerFields,
   Phase,
   PlayerId,
   PolyState,
@@ -34,8 +35,10 @@ export interface SetSpellView {
 export interface SideView {
   deckCount: number;
   handCount: number;
-  /** Only present for your own side. */
+  /** Your own side always; the opponent's only while a needlePick reveals it to you. */
   hand?: GameCard[];
+  /** Peek sticker: the top cards being rearranged — your own side, only while the peekArrange pending is yours. */
+  deckTop?: GameCard[];
   monsters: (MonsterView | null)[];
   spellTraps: (SetSpellView | null)[];
   graveyard: GameCard[];
@@ -53,6 +56,13 @@ export interface PlayerView {
   pendingWindow: GameState['pendingWindow'];
   /** Stack is public: cards on the stack are revealed. */
   stack: StackItem[];
+  /**
+   * M4 A2: both sides' per-player config overrides, always visible — boss
+   * cheats are public information by design (the Cheat Sheet scrawl reads them).
+   */
+  overrides?: [Partial<PerPlayerFields> | null, Partial<PerPlayerFields> | null];
+  /** REVISION 2: per-seat Cheat Sheet suit stickers — public, like overrides. */
+  suitOverrides?: GameState['config']['suitOverrides'];
   poly: PolyState | null;
   normalSummonUsed: boolean;
   you: SideView;
@@ -74,10 +84,18 @@ function monsterView(m: Monster, mine: boolean, turn: number): MonsterView {
 function sideView(state: GameState, side: PlayerId, viewer: PlayerId): SideView {
   const ps = state.players[side];
   const mine = side === viewer;
+  const peeking =
+    mine && state.pending?.type === 'peekArrange' && state.pending.player === side;
+  // Needle: the opponent's hand is revealed to the picker while they choose.
+  const revealed =
+    !mine && state.pending?.type === 'needlePick' && state.pending.player === viewer;
   return {
     deckCount: ps.deck.length,
     handCount: ps.hand.length,
-    ...(mine ? { hand: ps.hand } : {}),
+    ...(mine || revealed ? { hand: ps.hand } : {}),
+    ...(peeking
+      ? { deckTop: ps.deck.slice(0, (state.pending as { count: number }).count) }
+      : {}),
     monsters: ps.monsters.map((m) => (m ? monsterView(m, mine, state.turn) : null)),
     spellTraps: ps.spellTraps.map((st) =>
       st ? { card: mine ? st.card : null, setTurn: st.setTurn } : null,
@@ -99,6 +117,8 @@ export function viewFor(state: GameState, player: PlayerId): PlayerView {
     pending: state.pending,
     pendingWindow: state.pendingWindow,
     stack: state.stack,
+    ...(state.config.overrides ? { overrides: state.config.overrides } : {}),
+    ...(state.config.suitOverrides ? { suitOverrides: state.config.suitOverrides } : {}),
     poly: state.poly,
     normalSummonUsed: state.normalSummonUsed,
     you: sideView(state, player, player),

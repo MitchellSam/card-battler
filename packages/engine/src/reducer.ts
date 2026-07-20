@@ -3,7 +3,6 @@
 // through the injected SeededRNG.
 
 import {
-  effectiveFlipRank,
   effectivePower,
   isMonsterCard,
   isNumberRank,
@@ -14,7 +13,10 @@ import {
   sacrificeCost,
   suitWeight,
 } from './cards.js';
+import { cfg } from './config.js';
+import { effectiveCardEffect, effectiveFlipEffect, effectiveSuitEffect, getEffectSpec } from './effects.js';
 import { hasAnyActivation } from './legal.js';
+import { enumerateParams, validateParams, type EffectParams } from './params.js';
 import { showdown } from './poker.js';
 import { shuffle, type SeededRNG } from './rng.js';
 import { performAnte } from './setup.js';
@@ -22,12 +24,14 @@ import {
   IllegalActionError,
   type Action,
   type DistributiveOmit,
+  type EffectId,
   type GameCard,
   type GameEvent,
   type GameState,
   type Monster,
   type PlayerId,
   type PlayerState,
+  type Rank,
   type StackItem,
   type Suit,
 } from './types.js';
@@ -153,6 +157,24 @@ function destroyMonster(ctx: Ctx, loc: MonsterLoc, cause?: string): void {
 }
 
 /**
+ * Combat destruction, respecting the Doorstop sticker ("cannot be destroyed by
+ * combat this turn"). Returns whether the monster was actually destroyed —
+ * RULES-GAP: (provisional, EFFECT_CATALOG_v1 Doorstop) the catalog is silent
+ * on knock-on consequences of a prevented kill; conservative reading: only the
+ * destruction is prevented, and a bank trigger that requires a kill does not
+ * fire, while wall-punish (which punishes the failed attack, not the kill)
+ * still does.
+ */
+function destroyByCombat(ctx: Ctx, loc: MonsterLoc): boolean {
+  if (loc.m.combatImmuneTurn === ctx.s.turn) {
+    ctx.events.push({ type: 'CombatSurvived', uid: loc.m.uid, cardId: loc.m.card.id });
+    return false;
+  }
+  destroyMonster(ctx, loc);
+  return true;
+}
+
+/**
  * M2.5 §6 (no debuff floor): any monster whose effective power is ≤ 0 is
  * destroyed immediately upon the change. Not combat: no bank trigger, no
  * wall-punish. Checked after debuffs and after end-of-turn buff expiry.
@@ -173,53 +195,57 @@ function pushStack(ctx: Ctx, item: DistributiveOmit<StackItem, 'id'>): StackItem
   return withId;
 }
 
+/** Whether a flip effect id does anything (default 9/10 are effect-less). */
+function flipHasEffect(eff: EffectId): boolean {
+  return eff !== 'default:9' && eff !== 'default:10' && getEffectSpec(eff) !== undefined;
+}
+
 /**
- * Put a flip trigger on the stack (respondable — ♠ can negate it). Ranks 9/10
- * have no effect and generate no trigger. 2/6 need a target, chosen by the
- * monster's controller immediately (targets are picked when the trigger is put
- * on the stack; if the target is gone at resolution the effect fizzles).
+ * Put a flip trigger on the stack (respondable — ♠ can negate it). Default
+ * 9/10 have no effect and generate no trigger. REVISION 2: any effect can be
+ * a flip effect — if its spec needs params (a target, discard fuel, a summon
+ * position), the controller picks them NOW via the flipTarget pending, exactly
+ * like cast-time targeting; with no legal pick the trigger fizzles at
+ * resolution instead.
  */
 function queueFlipTrigger(ctx: Ctx, loc: MonsterLoc): void {
-  const rank = effectiveFlipRank(loc.m.card);
-  if (rank === '9' || rank === '10') return;
+  const eff = effectiveFlipEffect(loc.m.card);
+  if (!flipHasEffect(eff)) return;
   const item = pushStack(ctx, {
     kind: 'flip',
     controller: loc.player,
     monsterUid: loc.m.uid,
-    effectRank: rank,
+    effect: eff,
   });
   ctx.events.push({
     type: 'FlipTriggered',
     player: loc.player,
     uid: loc.m.uid,
     cardId: loc.m.card.id,
-    effectRank: rank,
+    effect: eff,
     stackItemId: item.id,
   });
-  if (rank === '2' || rank === '6') {
-    ctx.s.pending = {
-      type: 'flipTarget',
-      player: loc.player,
-      stackItemId: item.id,
-      effectRank: rank,
-    };
-  }
+  const spec = getEffectSpec(eff)!;
+  const needsParams =
+    (spec.target !== 'none' && !spec.subjectIsSource) || spec.fuel !== undefined;
+  if (needsParams && enumerateParams(ctx.s, loc.player, spec).length > 0)
+    ctx.s.pending = { type: 'flipTarget', player: loc.player, stackItemId: item.id, effect: eff };
 }
 
 /**
  * Ratified (2026-07): flip effects are declinable. When a monster flips
  * face-up, its controller is offered the trigger rather than having it forced
- * onto the stack. Ranks 9/10 have no effect, so there is nothing to decline —
+ * onto the stack. Effect-less flips (default 9/10) have nothing to decline —
  * they resolve to no pending, exactly as before.
  */
 function offerFlip(ctx: Ctx, loc: MonsterLoc): void {
-  const rank = effectiveFlipRank(loc.m.card);
-  if (rank === '9' || rank === '10') return;
+  const eff = effectiveFlipEffect(loc.m.card);
+  if (!flipHasEffect(eff)) return;
   ctx.s.pending = {
     type: 'flipDecision',
     player: loc.player,
     sourceUid: loc.m.uid,
-    effectRank: rank,
+    effect: eff,
   };
 }
 
@@ -333,7 +359,7 @@ function executeTransition(ctx: Ctx): void {
   s.phase = 'end';
   events.push({ type: 'PhaseChanged', phase: 'end', player: s.activePlayer });
   const ps = s.players[s.activePlayer];
-  if (ps.hand.length > s.config.handLimit) {
+  if (ps.hand.length > cfg(s, s.activePlayer, 'handLimit')) {
     s.pending = { type: 'discard', player: s.activePlayer };
   } else {
     finishTurn(ctx);
@@ -378,7 +404,7 @@ function drawPhase(ctx: Ctx): void {
   const player = s.activePlayer;
   const ps = s.players[player];
   const drawn: GameCard[] = [];
-  for (let i = 0; i < s.config.drawPerTurn; i++) {
+  for (let i = 0; i < cfg(s, player, 'drawPerTurn'); i++) {
     const card = ps.deck.shift();
     if (!card) {
       if (drawn.length > 0)
@@ -441,141 +467,48 @@ function suitEffectOf(suit: Suit): 'negate' | 'revive' | 'snipe' | 'poly' {
   }
 }
 
-function resolveSpell(ctx: Ctx, item: Extract<StackItem, { kind: 'spell' }>): void {
-  const { s, events } = ctx;
-  const ctrl = item.controller;
-  switch (item.effect) {
-    case 'J-rank': {
-      const loc = findMonster(s, item.targetMonsterUid);
-      if (!loc) fizzle(ctx, item, 'target left the field');
-      else destroyMonster(ctx, loc);
-      break;
-    }
-    case 'Q-rank': {
-      const loc = findMonster(s, item.targetMonsterUid);
-      if (!loc || loc.player !== ctrl || loc.m.position === 'set')
-        fizzle(ctx, item, 'target invalid');
-      else {
-        if (s.config.queenBuffDuration === 'permanent') loc.m.power += item.amount!;
-        else loc.m.tempAdds.push({ value: item.amount!, expiresTurn: s.turn });
-        events.push({
-          type: 'PowerChanged',
-          uid: loc.m.uid,
-          power: effectivePower(loc.m),
-          delta: item.amount,
-        });
-      }
-      break;
-    }
-    case 'K-rank': {
-      const loc = findMonster(s, item.targetMonsterUid);
-      if (!loc || loc.player === ctrl || loc.m.position === 'set')
-        fizzle(ctx, item, 'target invalid');
-      else {
-        loc.m.power -= item.amount!;
-        events.push({
-          type: 'PowerChanged',
-          uid: loc.m.uid,
-          power: effectivePower(loc.m),
-          delta: -item.amount!,
-        });
-        destroyDebuffed(ctx);
-      }
-      break;
-    }
-    case 'negate': {
-      const idx = s.stack.findIndex((i) => i.id === item.targetStackItemId);
-      if (idx < 0) fizzle(ctx, item, 'target no longer on stack');
-      else {
-        const [negated] = s.stack.splice(idx, 1);
-        if (negated && (negated.kind === 'spell' || negated.kind === 'joker'))
-          s.players[negated.controller].graveyard.push(negated.card);
-        events.push({
-          type: 'EffectNegated',
-          stackItemId: item.targetStackItemId,
-          by: item.card.id,
-        });
-      }
-      break;
-    }
-    case 'revive': {
-      const target = item.graveTarget!;
-      const gy = s.players[target.player].graveyard;
-      const gi = gy.findIndex((c) => c.id === target.cardId);
-      const zone = s.players[ctrl].monsters.findIndex((m) => m === null);
-      const card = gi >= 0 ? gy[gi]! : null;
-      if (!card || !isMonsterCard(card) || zone < 0) {
-        fizzle(ctx, item, 'revive target or zone unavailable');
-        break;
-      }
-      gy.splice(gi, 1);
-      const monster: Monster = {
-        uid: s.nextUid++,
-        card,
-        position: item.summonPosition ?? 'attack', // face-up; Heart explicitly triggers no flip effect
-        power: monsterBasePower(card),
-        tempAdds: [],
-        summonedTurn: s.turn,
-        attackedTurn: -1,
-        posChangedTurn: -1,
-      };
-      s.players[ctrl].monsters[zone] = monster;
-      events.push({
-        type: 'MonsterSpecialSummoned',
-        player: ctrl,
-        zoneIndex: zone,
-        uid: monster.uid,
-        cardId: card.id,
-        position: monster.position,
-      });
-      break;
-    }
-    case 'snipe': {
-      const t = item.targetSTZone!;
-      const st = s.players[t.player].spellTraps[t.zoneIndex];
-      if (!st) fizzle(ctx, item, 'target set card gone');
-      else {
-        s.players[t.player].spellTraps[t.zoneIndex] = null;
-        s.players[st.card.owner].graveyard.push(st.card);
-        events.push({
-          type: 'SetCardDestroyed', // revealed on the way to the graveyard
-          player: t.player,
-          zoneIndex: t.zoneIndex,
-          cardId: st.card.id,
-        });
-      }
-      break;
-    }
-    case 'poly': {
-      const loc = findMonster(s, item.targetMonsterUid);
-      if (!loc || loc.player !== ctrl || loc.m.position === 'set') {
-        fizzle(ctx, item, 'poly target invalid');
-        break;
-      }
-      s.players[ctrl].graveyard.push(item.card);
-      startPoly(ctx, ctrl, loc.m.uid);
-      return; // card already moved to graveyard
-    }
-  }
-  s.players[ctrl].graveyard.push(item.card);
-}
-
-function resolveFlip(ctx: Ctx, item: Extract<StackItem, { kind: 'flip' }>): void {
+/**
+ * REVISION 2: ONE context-free resolver for every effect. `item` is a spell
+ * or flip stack item — both carry the same param fields. `sourceLoc` is the
+ * flipped monster in flip context (the subject of subjectIsSource effects);
+ * casts have none. Returns the poly target uid when the effect hands off to
+ * the blackjack sub-machine (the caller finishes the card handling first).
+ */
+function resolveEffectCore(
+  ctx: Ctx,
+  item: Extract<StackItem, { kind: 'spell' | 'flip' }>,
+  sourceLoc: MonsterLoc | null,
+): { polyTarget?: number } {
   const { s, events, rng } = ctx;
-  const loc = findMonster(s, item.monsterUid);
-  if (!loc || loc.m.position === 'set') {
-    fizzle(ctx, item, 'flipped monster left the field');
-    return;
-  }
   const ctrl = item.controller;
   const opp = other(ctrl);
-  switch (item.effectRank) {
-    case 'A':
+  const spec = getEffectSpec(item.effect);
+  if (!spec) {
+    fizzle(ctx, item, `unimplemented effect ${item.effect}`);
+    return {};
+  }
+  if (spec.fuel && item.amount === undefined) {
+    fizzle(ctx, item, 'cost was never paid');
+    return {};
+  }
+  /** The effect's subject: the flipped monster in flip context, else the chosen target. */
+  const subject = (): MonsterLoc | null =>
+    spec.subjectIsSource && sourceLoc ? sourceLoc : findMonster(s, item.targetMonsterUid);
+  const target = () => findMonster(s, item.targetMonsterUid);
+
+  switch (item.effect) {
+    case 'default:A': {
+      const loc = subject();
+      if (!loc || loc.player !== ctrl || loc.m.position === 'set') {
+        fizzle(ctx, item, 'target invalid');
+        break;
+      }
       loc.m.tempSet = { value: 11, expiresTurn: s.turn };
       events.push({ type: 'PowerChanged', uid: loc.m.uid, power: effectivePower(loc.m) });
       break;
-    case '2': {
-      const tloc = findMonster(s, item.targetMonsterUid);
+    }
+    case 'default:2': {
+      const tloc = target();
       if (!tloc) {
         fizzle(ctx, item, 'position-flip target gone');
         break;
@@ -604,21 +537,21 @@ function resolveFlip(ctx: Ctx, item: Extract<StackItem, { kind: 'flip' }>): void
       }
       break;
     }
-    case '3':
+    case 'default:3':
       events.push({
         type: 'HandRevealed',
         player: opp,
         cardIds: s.players[opp].hand.map((c) => c.id),
       });
       break;
-    case '4':
+    case 'default:4':
       drawCards(ctx, ctrl, 1);
       break;
-    case '5':
+    case 'default:5':
       millCards(ctx, opp, 2);
       break;
-    case '6': {
-      const tloc = findMonster(s, item.targetMonsterUid);
+    case 'default:6': {
+      const tloc = target();
       if (!tloc) {
         fizzle(ctx, item, 'bounce target gone');
         break;
@@ -633,7 +566,7 @@ function resolveFlip(ctx: Ctx, item: Extract<StackItem, { kind: 'flip' }>): void
       });
       break;
     }
-    case '7': {
+    case 'default:7': {
       const hand = s.players[opp].hand;
       if (hand.length > 0) {
         const idx = rng.int(hand.length);
@@ -643,7 +576,7 @@ function resolveFlip(ctx: Ctx, item: Extract<StackItem, { kind: 'flip' }>): void
       }
       break;
     }
-    case '8': {
+    case 'default:8': {
       for (const p of [0, 1] as PlayerId[]) {
         const zones = s.players[p].monsters;
         for (let zone = 0; zone < zones.length; zone++) {
@@ -653,9 +586,235 @@ function resolveFlip(ctx: Ctx, item: Extract<StackItem, { kind: 'flip' }>): void
       }
       break;
     }
+    case 'default:J': {
+      const loc = target();
+      if (!loc) fizzle(ctx, item, 'target left the field');
+      else destroyMonster(ctx, loc);
+      break;
+    }
+    case 'default:Q': {
+      const loc = target();
+      if (!loc || loc.player !== ctrl || loc.m.position === 'set')
+        fizzle(ctx, item, 'target invalid');
+      else {
+        if (s.config.queenBuffDuration === 'permanent') loc.m.power += item.amount!;
+        else loc.m.tempAdds.push({ value: item.amount!, expiresTurn: s.turn });
+        events.push({
+          type: 'PowerChanged',
+          uid: loc.m.uid,
+          power: effectivePower(loc.m),
+          delta: item.amount,
+        });
+      }
+      break;
+    }
+    case 'default:K': {
+      const loc = target();
+      if (!loc || loc.player === ctrl || loc.m.position === 'set')
+        fizzle(ctx, item, 'target invalid');
+      else {
+        loc.m.power -= item.amount!;
+        events.push({
+          type: 'PowerChanged',
+          uid: loc.m.uid,
+          power: effectivePower(loc.m),
+          delta: -item.amount!,
+        });
+        destroyDebuffed(ctx);
+      }
+      break;
+    }
+    case 'default:♠': {
+      const idx = s.stack.findIndex((i) => i.id === item.targetStackItemId);
+      if (idx < 0) fizzle(ctx, item, 'target no longer on stack');
+      else {
+        const [negated] = s.stack.splice(idx, 1);
+        if (negated && (negated.kind === 'spell' || negated.kind === 'joker'))
+          s.players[negated.controller].graveyard.push(negated.card);
+        events.push({
+          type: 'EffectNegated',
+          stackItemId: item.targetStackItemId,
+          by: item.kind === 'spell' ? item.card.id : `flip:${item.monsterUid}`,
+        });
+      }
+      break;
+    }
+    case 'default:♥': {
+      const gt = item.graveTarget;
+      const gy = gt ? s.players[gt.player].graveyard : null;
+      const gi = gy && gt ? gy.findIndex((c) => c.id === gt.cardId) : -1;
+      const zone = s.players[ctrl].monsters.findIndex((m) => m === null);
+      const card = gy && gi >= 0 ? gy[gi]! : null;
+      if (!card || !isMonsterCard(card) || zone < 0) {
+        fizzle(ctx, item, 'revive target or zone unavailable');
+        break;
+      }
+      gy!.splice(gi, 1);
+      const monster: Monster = {
+        uid: s.nextUid++,
+        card,
+        position: item.summonPosition ?? 'attack', // face-up; Heart explicitly triggers no flip effect
+        power: monsterBasePower(card),
+        tempAdds: [],
+        summonedTurn: s.turn,
+        attackedTurn: -1,
+        posChangedTurn: -1,
+      };
+      s.players[ctrl].monsters[zone] = monster;
+      events.push({
+        type: 'MonsterSpecialSummoned',
+        player: ctrl,
+        zoneIndex: zone,
+        uid: monster.uid,
+        cardId: card.id,
+        position: monster.position,
+      });
+      break;
+    }
+    case 'default:♣': {
+      const t = item.targetSTZone;
+      const st = t ? s.players[t.player].spellTraps[t.zoneIndex] : null;
+      if (!t || !st) fizzle(ctx, item, 'target set card gone');
+      else {
+        s.players[t.player].spellTraps[t.zoneIndex] = null;
+        s.players[st.card.owner].graveyard.push(st.card);
+        events.push({
+          type: 'SetCardDestroyed', // revealed on the way to the graveyard
+          player: t.player,
+          zoneIndex: t.zoneIndex,
+          cardId: st.card.id,
+        });
+      }
+      break;
+    }
+    case 'default:♦': {
+      const loc = target();
+      if (!loc || loc.player !== ctrl || loc.m.position === 'set') {
+        fizzle(ctx, item, 'poly target invalid');
+        break;
+      }
+      return { polyTarget: loc.m.uid };
+    }
+    // --- catalog stickers ----------------------------------------------------
+    case 'peek': {
+      const deck = s.players[ctrl].deck;
+      const count = Math.min(3, deck.length);
+      if (count === 0) break;
+      events.push({
+        type: 'DeckPeeked',
+        player: ctrl,
+        count,
+        cardIds: deck.slice(0, count).map((c) => c.id),
+      });
+      s.pending = { type: 'peekArrange', player: ctrl, count };
+      break;
+    }
+    case 'skim':
+      millCards(ctx, ctrl, 1);
+      drawCards(ctx, ctrl, 1);
+      break;
+    case 'rally': {
+      // "your OTHER attack monsters": the flip source is excluded; a cast has
+      // no source, so every face-up attacker gets the +1.
+      for (const p of s.players[ctrl].monsters) {
+        if (!p || p.uid === sourceLoc?.m.uid || p.position !== 'attack') continue;
+        p.tempAdds.push({ value: 1, expiresTurn: s.turn });
+        events.push({ type: 'PowerChanged', uid: p.uid, power: effectivePower(p), delta: 1 });
+      }
+      break;
+    }
+    case 'doorstop': {
+      // Consumed by destroyByCombat; expires when the turn number moves on.
+      const loc = subject();
+      if (!loc || loc.player !== ctrl) {
+        fizzle(ctx, item, 'target invalid');
+        break;
+      }
+      loc.m.combatImmuneTurn = s.turn;
+      break;
+    }
+    case 'needle': {
+      const hand = s.players[opp].hand;
+      events.push({ type: 'HandRevealed', player: opp, cardIds: hand.map((c) => c.id) });
+      if (hand.length > 0) s.pending = { type: 'needlePick', player: ctrl };
+      break;
+    }
+    case 'scavenge': {
+      const gy = s.players[ctrl].graveyard;
+      if (gy.length === 0) break;
+      const [card] = gy.splice(rng.int(gy.length), 1);
+      s.players[ctrl].hand.push(card!);
+      events.push({ type: 'CardRecovered', player: ctrl, cardId: card!.id });
+      break;
+    }
+    case 'warning-shot': {
+      const tloc = target();
+      if (!tloc || tloc.m.position !== 'set') {
+        fizzle(ctx, item, 'warning-shot target no longer face-down');
+        break;
+      }
+      // RULES-GAP: (provisional, EFFECT_CATALOG_v1 Warning Shot) the catalog
+      // says "reveal itself (flip face-up) without triggering its flip effect"
+      // but is silent on the resulting position — conservative reading: the
+      // monster stays in DEFENSE (face-up), unlike the default-2 effect-flip
+      // which was ratified to land in ATTACK.
+      tloc.m.position = 'defense';
+      events.push({
+        type: 'MonsterFlipped',
+        player: tloc.player,
+        uid: tloc.m.uid,
+        cardId: tloc.m.card.id,
+        by: 'reveal', // explicitly no flip trigger
+      });
+      break;
+    }
+    case 'leverage': {
+      const loc = target();
+      if (!loc || loc.player !== ctrl || loc.m.position === 'set')
+        fizzle(ctx, item, 'target invalid');
+      else {
+        // RULES-GAP: (provisional, EFFECT_CATALOG_v1 Leverage) always end-of-
+        // turn — the Everlasting sheet mod's queenBuffDuration is read as
+        // covering only the DEFAULT Queen effect, not alternates.
+        loc.m.tempAdds.push({ value: item.amount!, expiresTurn: s.turn });
+        events.push({
+          type: 'PowerChanged',
+          uid: loc.m.uid,
+          power: effectivePower(loc.m),
+          delta: item.amount,
+        });
+      }
+      break;
+    }
+    case 'executioners-toll': {
+      const loc = target();
+      // Re-checked at resolution: a pumped-up target (power now > 5) fizzles.
+      if (!loc || loc.m.position === 'set' || effectivePower(loc.m) > 5)
+        fizzle(ctx, item, 'target invalid or power above 5');
+      else destroyMonster(ctx, loc);
+      break;
+    }
     default:
-      break; // 9 / 10 never reach the stack
+      fizzle(ctx, item, `unimplemented effect ${item.effect}`);
+      break;
   }
+  return {};
+}
+
+function resolveSpell(ctx: Ctx, item: Extract<StackItem, { kind: 'spell' }>): void {
+  const r = resolveEffectCore(ctx, item, null);
+  ctx.s.players[item.controller].graveyard.push(item.card);
+  if (r.polyTarget !== undefined) startPoly(ctx, item.controller, r.polyTarget);
+}
+
+function resolveFlip(ctx: Ctx, item: Extract<StackItem, { kind: 'flip' }>): void {
+  const loc = findMonster(ctx.s, item.monsterUid);
+  if (!loc || loc.m.position === 'set') {
+    fizzle(ctx, item, 'flipped monster left the field');
+    return;
+  }
+  const r = resolveEffectCore(ctx, item, loc);
+  if (r.polyTarget !== undefined) startPoly(ctx, item.controller, r.polyTarget);
 }
 
 function resolveAttack(ctx: Ctx, item: Extract<StackItem, { kind: 'attack' }>): void {
@@ -692,10 +851,28 @@ function resolveAttack(ctx: Ctx, item: Extract<StackItem, { kind: 'attack' }>): 
   }
   const tloc = findMonster(s, item.target);
   if (!tloc) {
+    // Playtest-1: the declared target left the field mid-battle. Offer a YGO
+    // Battle Replay (re-target / direct / decline) instead of fizzling.
+    if (offerBattleReplay(ctx, item.controller, item.attackerUid)) return;
     fizzle(ctx, item, 'attack target left the field');
     return;
   }
   attackMonster(ctx, item.controller, item.attackerUid, tloc);
+}
+
+/**
+ * Set a battleReplay pending if the rule is on and the attacker is still a
+ * valid attacker. Returns true when a pending was set (caller must stop). An
+ * attacker that itself left the field gets no replay (M2.5 §12).
+ */
+function offerBattleReplay(ctx: Ctx, attacker: PlayerId, attackerUid: number): boolean {
+  const { s, events } = ctx;
+  if (!s.config.battleReplay) return false;
+  const aloc = findMonster(s, attackerUid);
+  if (!aloc || aloc.m.position !== 'attack') return false;
+  s.pending = { type: 'battleReplay', player: attacker, attackerUid };
+  events.push({ type: 'BattleReplay', attacker, attackerUid });
+  return true;
 }
 
 /** Resolve an attack against a specific monster: flip-then-combat if it's set. */
@@ -766,27 +943,26 @@ function resolveCombat(ctx: Ctx, attackerUid: number, targetUid: number): void {
     // twin card from the other deck): both destroyed regardless of the
     // defender's position; a tie is neither a win nor a loss, so no bank
     // trigger and no wall-punish.
-    destroyMonster(ctx, tloc);
-    destroyMonster(ctx, aloc);
+    destroyByCombat(ctx, tloc);
+    destroyByCombat(ctx, aloc);
     return;
   }
   if (defenderPosition === 'attack') {
     if (cmp > 0) {
       const count = bankTriggerCards(s, ap, dp); // attacker won by (ap − dp)
-      destroyMonster(ctx, tloc);
-      awardBankTrigger(ctx, aloc.player, count);
+      if (destroyByCombat(ctx, tloc)) awardBankTrigger(ctx, aloc.player, count);
     } else {
       const count = bankTriggerCards(s, dp, ap); // defender won by (dp − ap)
-      destroyMonster(ctx, aloc);
-      awardBankTrigger(ctx, tloc.player, count); // winner of an attack-vs-attack fight gets the choice regardless of who declared
+      // winner of an attack-vs-attack fight gets the choice regardless of who declared
+      if (destroyByCombat(ctx, aloc)) awardBankTrigger(ctx, tloc.player, count);
     }
     return;
   }
   // Attack vs defense (set monsters were flipped face-up before combat)
   if (cmp > 0) {
-    destroyMonster(ctx, tloc); // no bank trigger against a wall
+    destroyByCombat(ctx, tloc); // no bank trigger against a wall
   } else {
-    destroyMonster(ctx, aloc);
+    destroyByCombat(ctx, aloc);
     doWallPunish(ctx, aloc.player);
   }
 }
@@ -1084,74 +1260,38 @@ function handleCastSpell(ctx: Ctx, action: Extract<Action, { type: 'castSpell' }
     card = st.card;
   }
 
+  // REVISION 2 (slotless): the card's sticker (or printed default) IS its
+  // rank effect; the suit effect comes from the caster's Cheat Sheet
+  // (config.suitOverrides) or the printed suit default.
   const effect =
     action.mode === 'rank'
-      ? (`${card.rank}-rank` as 'J-rank' | 'Q-rank' | 'K-rank')
-      : suitEffectOf(card.suit!);
+      ? effectiveCardEffect(card)
+      : effectiveSuitEffect(s.config.suitOverrides, player, card.suit!);
+  const spec = getEffectSpec(effect);
+  if (!spec) fail(`no implementation for effect ${effect}`, action);
+  if (effect === 'default:9' || effect === 'default:10')
+    fail('this card has no castable effect', action);
 
   // Validate targets & costs at cast time (fizzles if invalid at resolution).
-  let amount: number | undefined;
-  let discarded: GameCard | undefined;
-  const target = findMonster(s, action.targetMonsterUid);
-  switch (effect) {
-    case 'J-rank':
-      if (!target) fail('J: no target monster', action);
-      break;
-    case 'Q-rank':
-    case 'K-rank': {
-      if (!target || target.m.position === 'set') fail(`${effect}: bad target`, action);
-      if (effect === 'Q-rank' && target.player !== player) fail('Q targets your monster', action);
-      if (effect === 'K-rank' && target.player === player) fail("K targets opponent's monster", action);
-      const di = action.discardHandIndex;
-      if (di === undefined) fail('Q/K require a number-card discard', action);
-      if (action.source.from === 'hand' && di === action.source.handIndex)
-        fail('cannot discard the spell itself', action);
-      const dc = ps.hand[di];
-      if (!dc || !isNumberRank(dc.rank)) fail('discard must be a number card', action);
-      // M2.5 §4: an Ace discarded as Q/K fuel is 1 or 11, caster's choice at cast time.
-      if (dc.rank === 'A') {
-        if (action.aceValue !== 1 && action.aceValue !== 11)
-          fail('discarding an Ace requires aceValue 1 or 11', action);
-        amount = action.aceValue;
-      } else {
-        if (action.aceValue !== undefined) fail('aceValue is only legal with an Ace discard', action);
-        amount = numberValue(dc.rank);
-      }
-      discarded = dc;
-      break;
-    }
-    case 'negate': {
-      const t = s.stack.find((i) => i.id === action.targetStackItemId);
-      if (!t || (t.kind !== 'spell' && t.kind !== 'joker' && t.kind !== 'flip'))
-        fail('negate: target must be a card/effect on the stack', action);
-      break;
-    }
-    case 'revive': {
-      const gt = action.graveTarget;
-      if (!gt) fail('revive: no graveyard target', action);
-      const gc = s.players[gt.player].graveyard.find((c) => c.id === gt.cardId);
-      if (!gc || !isMonsterCard(gc)) fail('revive: target is not a monster in that graveyard', action);
-      if (!ps.monsters.some((m) => m === null)) fail('revive: no free monster zone', action);
-      if (!action.summonPosition) fail('revive: choose a face-up position', action);
-      break;
-    }
-    case 'snipe': {
-      const t = action.targetSTZone;
-      if (!t) fail('snipe: no target', action);
-      if (
-        action.source.from === 'zone' &&
-        t.player === player &&
-        t.zoneIndex === action.source.zoneIndex
-      )
-        fail('snipe: cannot target itself', action);
-      if (!s.players[t.player].spellTraps[t.zoneIndex]) fail('snipe: zone is empty', action);
-      break;
-    }
-    case 'poly':
-      if (!target || target.player !== player || target.m.position === 'set')
-        fail('poly: target one face-up monster you control', action);
-      break;
-  }
+  const params: EffectParams = {
+    ...(action.targetMonsterUid !== undefined ? { targetMonsterUid: action.targetMonsterUid } : {}),
+    ...(action.targetStackItemId !== undefined ? { targetStackItemId: action.targetStackItemId } : {}),
+    ...(action.targetSTZone ? { targetSTZone: action.targetSTZone } : {}),
+    ...(action.graveTarget ? { graveTarget: action.graveTarget } : {}),
+    ...(action.summonPosition ? { summonPosition: action.summonPosition } : {}),
+    ...(action.discardHandIndex !== undefined ? { discardHandIndex: action.discardHandIndex } : {}),
+    ...(action.aceValue !== undefined ? { aceValue: action.aceValue } : {}),
+  };
+  const check = validateParams(s, player, spec, params, {
+    ...(action.source.from === 'hand' ? { excludeHandIndex: action.source.handIndex } : {}),
+    ...(action.source.from === 'zone'
+      ? { excludeSTZone: { player, zoneIndex: action.source.zoneIndex } }
+      : {}),
+  });
+  if (!check.ok) fail(`${effect}: ${check.reason}`, action);
+  const amount = check.amount;
+  const discarded =
+    params.discardHandIndex !== undefined ? ps.hand[params.discardHandIndex] : undefined;
 
   // Pay cost, then move the card to the stack.
   if (discarded) {
@@ -1294,7 +1434,7 @@ function handleDiscardCard(ctx: Ctx, action: Extract<Action, { type: 'discardCar
   ps.hand.splice(action.handIndex, 1);
   ps.graveyard.push(card);
   events.push({ type: 'CardDiscarded', player: action.player, cardId: card.id, handLimit: true });
-  if (ps.hand.length > s.config.handLimit) return; // keep discarding
+  if (ps.hand.length > cfg(s, action.player, 'handLimit')) return; // keep discarding
   s.pending = null;
   finishTurn(ctx);
 }
@@ -1358,13 +1498,40 @@ function handleFlipChoice(ctx: Ctx, action: Extract<Action, { type: 'flipChoice'
 }
 
 function handleChooseFlipTarget(ctx: Ctx, action: Extract<Action, { type: 'chooseFlipTarget' }>): void {
-  const { s } = ctx;
+  const { s, events } = ctx;
   if (s.pending?.type !== 'flipTarget' || s.pending.player !== action.player)
     fail('no flip target pending for you', action);
-  const item = s.stack.find((i) => i.id === (s.pending as { stackItemId: number }).stackItemId);
+  const pending = s.pending;
+  const item = s.stack.find((i) => i.id === pending.stackItemId);
   if (!item || item.kind !== 'flip') fail('flip trigger vanished', action);
-  if (!findMonster(s, action.monsterUid)) fail('no such monster on field', action);
-  item.targetMonsterUid = action.monsterUid;
+  const spec = getEffectSpec(pending.effect);
+  if (!spec) fail(`unknown effect ${pending.effect}`, action);
+  const params: EffectParams = {
+    ...(action.monsterUid !== undefined ? { targetMonsterUid: action.monsterUid } : {}),
+    ...(action.targetStackItemId !== undefined ? { targetStackItemId: action.targetStackItemId } : {}),
+    ...(action.targetSTZone ? { targetSTZone: action.targetSTZone } : {}),
+    ...(action.graveTarget ? { graveTarget: action.graveTarget } : {}),
+    ...(action.summonPosition ? { summonPosition: action.summonPosition } : {}),
+    ...(action.discardHandIndex !== undefined ? { discardHandIndex: action.discardHandIndex } : {}),
+    ...(action.aceValue !== undefined ? { aceValue: action.aceValue } : {}),
+  };
+  const check = validateParams(s, action.player, spec, params);
+  if (!check.ok) fail(`${pending.effect}: ${check.reason}`, action);
+  // Pay fuel now, exactly like cast time.
+  if (params.discardHandIndex !== undefined) {
+    const ps = s.players[action.player];
+    const [dc] = ps.hand.splice(params.discardHandIndex, 1);
+    ps.graveyard.push(dc!);
+    events.push({ type: 'CardDiscarded', player: action.player, cardId: dc!.id, cost: true });
+  }
+  Object.assign(item, {
+    ...(params.targetMonsterUid !== undefined ? { targetMonsterUid: params.targetMonsterUid } : {}),
+    ...(params.targetStackItemId !== undefined ? { targetStackItemId: params.targetStackItemId } : {}),
+    ...(params.targetSTZone ? { targetSTZone: params.targetSTZone } : {}),
+    ...(params.graveTarget ? { graveTarget: params.graveTarget } : {}),
+    ...(params.summonPosition ? { summonPosition: params.summonPosition } : {}),
+    ...(check.amount !== undefined ? { amount: check.amount } : {}),
+  });
   s.pending = null;
   resumeFlow(ctx);
 }
@@ -1386,6 +1553,47 @@ function handleChooseInterceptor(ctx: Ctx, action: Extract<Action, { type: 'choo
   resumeFlow(ctx);
 }
 
+function handleReplayAttack(ctx: Ctx, action: Extract<Action, { type: 'replayAttack' }>): void {
+  const { s, events } = ctx;
+  if (s.pending?.type !== 'battleReplay' || s.pending.player !== action.player)
+    fail('no battle replay pending for you', action);
+  const attackerUid = s.pending.attackerUid;
+  s.pending = null;
+  const aloc = findMonster(s, attackerUid);
+  if (!aloc || aloc.m.position !== 'attack') {
+    events.push({ type: 'EffectFizzled', kind: 'attack', reason: 'attacker no longer in attack position' });
+    resumeFlow(ctx);
+    return;
+  }
+  const opp = s.players[other(action.player)];
+  if (action.direct) {
+    if (opp.monsters.some((m) => m !== null))
+      fail('replay direct attack is only legal when the opponent controls zero monsters', action);
+    events.push({ type: 'CombatResolved', direct: true, attacker: action.player });
+    awardBankTrigger(ctx, action.player, bankTriggerCards(s, effectivePower(aloc.m)));
+  } else {
+    const tm = action.targetZone !== undefined ? opp.monsters[action.targetZone] : null;
+    if (!tm) fail('no target monster in that zone', action);
+    attackMonster(ctx, action.player, attackerUid, findMonster(s, tm.uid)!);
+  }
+  resumeFlow(ctx);
+}
+
+function handleReplayDecline(ctx: Ctx, action: Extract<Action, { type: 'replayDecline' }>): void {
+  const { s, events } = ctx;
+  if (s.pending?.type !== 'battleReplay' || s.pending.player !== action.player)
+    fail('no battle replay pending for you', action);
+  const { attackerUid } = s.pending;
+  s.pending = null;
+  events.push({ type: 'ReplayDeclined', player: action.player });
+  // Ratified (Playtest-2): a declined battle replay means the attack "did not
+  // happen" (true YGO) — free the attacker to attack again this turn by clearing
+  // the attackedTurn flag that declaration set.
+  const aloc = findMonster(s, attackerUid);
+  if (aloc) aloc.m.attackedTurn = -1;
+  resumeFlow(ctx);
+}
+
 function handleWallPunishPick(ctx: Ctx, action: Extract<Action, { type: 'wallPunishPick' }>): void {
   const { s } = ctx;
   if (s.pending?.type !== 'wallPunishPick' || s.pending.player !== action.player)
@@ -1393,6 +1601,41 @@ function handleWallPunishPick(ctx: Ctx, action: Extract<Action, { type: 'wallPun
   const attacker = s.pending.attacker;
   if (!s.players[attacker].bank[action.bankIndex]) fail('no such bank card', action);
   removeBankCard(ctx, attacker, action.bankIndex, 'wallPunish');
+  s.pending = null;
+  resumeFlow(ctx);
+}
+
+function handlePeekArrange(ctx: Ctx, action: Extract<Action, { type: 'peekArrange' }>): void {
+  const { s, events } = ctx;
+  if (s.pending?.type !== 'peekArrange' || s.pending.player !== action.player)
+    fail('no peek pending for you', action);
+  const { count } = s.pending;
+  const order = action.order;
+  if (
+    order.length !== count ||
+    new Set(order).size !== count ||
+    order.some((i) => i < 0 || i >= count)
+  )
+    fail(`order must be a permutation of 0..${count - 1}`, action);
+  const deck = s.players[action.player].deck;
+  const top = deck.slice(0, count);
+  deck.splice(0, count, ...order.map((i) => top[i]!));
+  events.push({ type: 'DeckRearranged', player: action.player, count });
+  s.pending = null;
+  resumeFlow(ctx);
+}
+
+function handleNeedlePick(ctx: Ctx, action: Extract<Action, { type: 'needlePick' }>): void {
+  const { s, events } = ctx;
+  if (s.pending?.type !== 'needlePick' || s.pending.player !== action.player)
+    fail('no needle pick pending for you', action);
+  const opp = other(action.player);
+  const hand = s.players[opp].hand;
+  const card = hand[action.handIndex];
+  if (!card) fail('no such opponent hand card', action);
+  hand.splice(action.handIndex, 1);
+  s.players[opp].graveyard.push(card);
+  events.push({ type: 'CardDiscarded', player: opp, cardId: card.id, by: 'needle' });
   s.pending = null;
   resumeFlow(ctx);
 }
@@ -1482,8 +1725,20 @@ export function applyAction(
     case 'chooseInterceptor':
       handleChooseInterceptor(ctx, action);
       break;
+    case 'replayAttack':
+      handleReplayAttack(ctx, action);
+      break;
+    case 'replayDecline':
+      handleReplayDecline(ctx, action);
+      break;
     case 'wallPunishPick':
       handleWallPunishPick(ctx, action);
+      break;
+    case 'peekArrange':
+      handlePeekArrange(ctx, action);
+      break;
+    case 'needlePick':
+      handleNeedlePick(ctx, action);
       break;
     case 'polyHit':
       handlePolyHit(ctx, action);
