@@ -141,3 +141,16 @@ describe('per-player config overlay', () => {
     expect(play()).toBe(play());
   }, 30000);
 });
+
+describe('viewFor exposes the full config (rules are public)', () => {
+  it('both seats see the same live RulesConfig, overrides included', () => {
+    const config = { ...DEFAULT_CONFIG, overrides: [{ drawPerTurn: 3 }, null] as [{ drawPerTurn: number }, null] };
+    const { state } = setupGame(createRng(7), { config });
+    for (const seat of [0, 1] as const) {
+      const v = viewFor(state, seat);
+      expect(v.config).toEqual(config);
+      expect(cfgFor(v.config, 0, 'drawPerTurn')).toBe(3);
+      expect(cfgFor(v.config, 1, 'drawPerTurn')).toBe(2);
+    }
+  });
+});

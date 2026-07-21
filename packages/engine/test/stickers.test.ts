@@ -524,3 +524,15 @@ describe('seed uncommons (cast-context behaviour)', () => {
     expect(types(r.events)).toContain('EffectFizzled');
   });
 });
+
+describe('harm tags (UI reads these instead of hardcoding effect ids)', () => {
+  it('destructive/weakening effects carry harm; neutral ones carry none', () => {
+    expect(getEffectSpec('default:J')!.harm).toBe('destroy');
+    expect(getEffectSpec('executioners-toll')!.harm).toBe('destroy');
+    expect(getEffectSpec('default:♣')!.harm).toBe('destroy');
+    expect(getEffectSpec('default:K')!.harm).toBe('weaken');
+    expect(getEffectSpec('default:Q')!.harm).toBeUndefined();
+    expect(getEffectSpec('default:♥')!.harm).toBeUndefined();
+    expect(getEffectSpec('peek')!.harm).toBeUndefined();
+  });
+});

@@ -6,12 +6,13 @@ import {
   describeEffect,
   effectiveCardEffect,
   effectiveSuitEffect,
+  getEffectSpec,
   type Action,
   type GameCard,
   type PlayerView,
 } from '@house-rules/engine';
 import { HUMAN } from '../session/GameSession.js';
-import { faceFromId, faceLabel } from '../ui/cardFace.js';
+import { faceFromId, faceLabel, jokerText } from '../ui/cardFace.js';
 
 type UidName = (uid: number) => string | null;
 
@@ -47,22 +48,25 @@ function castEffect(a: Extract<Action, { type: 'castSpell' }>, view: PlayerView)
 
 /**
  * A loud warning when a composed action would hit one of the player's OWN cards
- * destructively (♣ snipe on your set card, J destroy / K weaken on your monster)
- * — shown in the confirm popup so a single-target auto-advance can't quietly
- * blow up your own board. Returns null when nothing self-destructive is targeted.
+ * destructively — shown in the confirm popup so a single-target auto-advance
+ * can't quietly blow up your own board. Which effects are harmful comes from
+ * the engine registry (EffectSpec.harm), never a hardcoded id list, so new
+ * destructive stickers warn automatically. Returns null when nothing
+ * self-destructive is targeted.
  */
 export function selfTargetWarning(a: Action, view: PlayerView, uidName: UidName): string | null {
   if (a.type !== 'castSpell') return null;
-  if (a.targetSTZone && a.targetSTZone.player === HUMAN)
+  const harm = (eff: string | null): 'destroy' | 'weaken' | undefined =>
+    eff ? getEffectSpec(eff)?.harm : undefined;
+  if (a.targetSTZone && a.targetSTZone.player === HUMAN && harm(castEffect(a, view)) === 'destroy')
     return `This DESTROYS your own set card in S${a.targetSTZone.zoneIndex + 1}.`;
   if (a.targetMonsterUid !== undefined) {
     const mine = view.you.monsters.some((m) => m?.uid === a.targetMonsterUid);
     if (!mine) return null;
-    const eff = castEffect(a, view);
+    const h = harm(castEffect(a, view));
     const face = uidName(a.targetMonsterUid) ?? 'your monster';
-    if (eff === 'default:J' || eff === 'executioners-toll')
-      return `This DESTROYS your own ${face}.`;
-    if (eff === 'default:K') return `This WEAKENS your own ${face}.`;
+    if (h === 'destroy') return `This DESTROYS your own ${face}.`;
+    if (h === 'weaken') return `This WEAKENS your own ${face}.`;
   }
   return null;
 }
@@ -100,7 +104,7 @@ export function actionSummary(a: Action, view: PlayerView, uidName: UidName): st
       return `Cast ${src} — "${effName}"${tgt}${fuel}${ace}?`;
     }
     case 'castJoker':
-      return `Cast Joker (draw 2)?`;
+      return `Cast Joker — ${jokerText()}?`;
     case 'declareAttack':
       return a.direct
         ? `Attack DIRECTLY with ${zoneFace(view, a.attackerZone)}?`

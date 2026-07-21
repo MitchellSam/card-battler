@@ -13,6 +13,7 @@ import type {
   Phase,
   PlayerId,
   PolyState,
+  RulesConfig,
   StackItem,
 } from './types.js';
 
@@ -56,6 +57,14 @@ export interface PlayerView {
   pendingWindow: GameState['pendingWindow'];
   /** Stack is public: cards on the stack are revealed. */
   stack: StackItem[];
+  /**
+   * The full rules config — PUBLIC. The rules of the game are never hidden
+   * information (boss cheats are visible by design), and every UI surface that
+   * states a rule (Cheat Sheet, tooltips, labels) must read it from here or
+   * the effect registry — never hardcode it. `overrides`/`suitOverrides`
+   * below predate this field and remain as convenience views of it.
+   */
+  config: RulesConfig;
   /**
    * M4 A2: both sides' per-player config overrides, always visible — boss
    * cheats are public information by design (the Cheat Sheet scrawl reads them).
@@ -117,6 +126,7 @@ export function viewFor(state: GameState, player: PlayerId): PlayerView {
     pending: state.pending,
     pendingWindow: state.pendingWindow,
     stack: state.stack,
+    config: state.config,
     ...(state.config.overrides ? { overrides: state.config.overrides } : {}),
     ...(state.config.suitOverrides ? { suitOverrides: state.config.suitOverrides } : {}),
     poly: state.poly,

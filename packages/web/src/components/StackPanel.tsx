@@ -3,7 +3,7 @@
 // named. Visible whenever the stack is non-empty.
 
 import { describeEffect, type PlayerView, type StackItem } from '@house-rules/engine';
-import { faceOf, faceLabel, type CardFace } from '../ui/cardFace.js';
+import { faceOf, faceLabel, jokerText, type CardFace } from '../ui/cardFace.js';
 import { PLAYER_NAMES } from '../session/describeEvent.js';
 import { HUMAN } from '../session/GameSession.js';
 import { Card } from './Card.js';
@@ -42,7 +42,7 @@ function itemText(item: StackItem, view: PlayerView): string {
       return `${eff}${amount}${target}`;
     }
     case 'joker':
-      return 'Joker — draw 2';
+      return `Joker — ${jokerText()}`;
     case 'flip':
       return `flip effect (${describeEffect(item.effect).name}) of ${monsterName(view, item.monsterUid)}${
         item.targetMonsterUid !== undefined ? ` → ${monsterName(view, item.targetMonsterUid)}` : ''

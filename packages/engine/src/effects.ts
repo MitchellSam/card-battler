@@ -44,6 +44,13 @@ export interface EffectSpec {
   fuel?: 'number' | 'face';
   /** graveMonster targets also pick the face-up summon position. */
   needsPosition?: boolean;
+  /**
+   * What the effect does TO ITS PICKED TARGET — machine-readable so the UI can
+   * warn about self-destructive picks without hardcoding effect ids. Absent =
+   * neutral/beneficial to the target. Untargeted board-wipes (default:8) carry
+   * nothing: no target is ever picked for them.
+   */
+  harm?: 'destroy' | 'weaken';
   /** May appear in run reward/pack pools (effect-less 9/10 do not). */
   poolable: boolean;
   /** Unlocked from the start (the base game's defaults). */
@@ -108,6 +115,7 @@ export const EFFECT_SPECS: EffectSpec[] = [
   }),
   sticker('executioners-toll', 'uncommon', "Executioner's Toll", 'Destroy a monster with power 5 or lower.', {
     target: 'faceUpPowerLE5',
+    harm: 'destroy',
   }),
   // --- base-game defaults, now poolable stickers ---------------------------
   dflt('A', 'common', 'power becomes 11 until end of turn', { target: 'ownFaceUp', subjectIsSource: true }),
@@ -120,7 +128,7 @@ export const EFFECT_SPECS: EffectSpec[] = [
   dflt('8', 'common', 'destroy every attack-position monster (both sides)'),
   dflt('9', 'common', 'no flip effect', { poolable: false }),
   dflt('10', 'common', 'no flip effect', { poolable: false }),
-  dflt('J', 'uncommon', 'destroy any one monster', { target: 'anyMonster' }),
+  dflt('J', 'uncommon', 'destroy any one monster', { target: 'anyMonster', harm: 'destroy' }),
   dflt('Q', 'uncommon', 'discard a number card → your monster +its value (this turn)', {
     target: 'ownFaceUp',
     fuel: 'number',
@@ -128,13 +136,14 @@ export const EFFECT_SPECS: EffectSpec[] = [
   dflt('K', 'uncommon', 'discard a number card → enemy monster −its value (permanent)', {
     target: 'oppFaceUp',
     fuel: 'number',
+    harm: 'weaken',
   }),
   dflt('♠', 'uncommon', 'negate a card/effect on the stack', { target: 'stackItem' }),
   dflt('♥', 'uncommon', 'revive a monster from either graveyard (no flip effect)', {
     target: 'graveMonster',
     needsPosition: true,
   }),
-  dflt('♣', 'uncommon', 'destroy a set spell/trap', { target: 'setSpellZone' }),
+  dflt('♣', 'uncommon', 'destroy a set spell/trap', { target: 'setSpellZone', harm: 'destroy' }),
   dflt('♦', 'uncommon', 'Polymerization — blackjack-fuse one of your monsters', { target: 'ownFaceUp' }),
 ];
 

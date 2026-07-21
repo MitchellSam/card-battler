@@ -19,7 +19,7 @@ import {
 import { actionSummary, selfTargetWarning } from './interact/summary.js';
 import { AI, GameSession, HUMAN } from './session/GameSession.js';
 import { PLAYER_NAMES } from './session/describeEvent.js';
-import { faceFromId, faceLabel, faceOf } from './ui/cardFace.js';
+import { faceFromId, faceLabel, faceOf, jokerText, rankCastLabel, suitCastLabel, type SuitOverrides } from './ui/cardFace.js';
 import { Board, cellKey, type Cell, type PileId } from './components/Board.js';
 import { Card, type Highlight } from './components/Card.js';
 import { CheatSheet } from './components/CheatSheet.js';
@@ -708,7 +708,7 @@ export function DuelScreen({ session, scrawls = [], endOverlay = null, extra = n
               title={card ? `${faceLabel(faceOf(card))} — do what?` : 'do what?'}
               buttons={[
                 ...step.verbs.map((v) => ({
-                  label: verbLabel(v, card),
+                  label: verbLabel(v, card, view.suitOverrides),
                   tone: 'blue' as const,
                   onClick: () => choose(v),
                 })),
@@ -958,7 +958,7 @@ export function DuelScreen({ session, scrawls = [], endOverlay = null, extra = n
       </div>
 
       {pileModal}
-      {cheatOpen && <CheatSheet scrawls={scrawls} onClose={() => setCheatOpen(false)} />}
+      {cheatOpen && <CheatSheet view={view} scrawls={scrawls} onClose={() => setCheatOpen(false)} />}
       {view.result && endOverlay}
       {extra}
     </div>
@@ -1021,7 +1021,10 @@ function sameSet(xs: number[], set: Set<number>): boolean {
   return xs.length === set.size && xs.every((x) => set.has(x));
 }
 
-function verbLabel(v: VerbKey, card: GameCard | null): string {
+// Cast labels resolve through the card's EFFECTIVE effects (stickers, Cheat
+// Sheet suit stickers) via the engine registry — never a hardcoded rank/suit
+// table, which would drift the moment a sticker covers an effect.
+function verbLabel(v: VerbKey, card: GameCard | null, suitOverrides?: SuitOverrides): string {
   switch (v) {
     case 'summon:attack':
       return 'SUMMON — attack position';
@@ -1030,31 +1033,11 @@ function verbLabel(v: VerbKey, card: GameCard | null): string {
     case 'setSpell':
       return 'SET spell/trap';
     case 'cast:rank':
-      switch (card?.rank) {
-        case 'J':
-          return 'CAST rank — DESTROY a monster';
-        case 'Q':
-          return 'CAST rank — BUFF (discard fuel)';
-        case 'K':
-          return 'CAST rank — WEAKEN (discard fuel)';
-        default:
-          return 'CAST — rank effect';
-      }
+      return card ? `CAST rank — ${rankCastLabel(card)}` : 'CAST — rank effect';
     case 'cast:suit':
-      switch (card?.suit) {
-        case '♠':
-          return 'CAST suit — NEGATE ♠';
-        case '♥':
-          return 'CAST suit — REVIVE ♥';
-        case '♣':
-          return 'CAST suit — SNIPE ♣';
-        case '♦':
-          return 'CAST suit — POLY ♦';
-        default:
-          return 'CAST — suit effect';
-      }
+      return card?.suit ? `CAST ${card.suit} — ${suitCastLabel(card, suitOverrides)}` : 'CAST — suit effect';
     case 'castJoker':
-      return 'CAST Joker — draw 2';
+      return `CAST Joker — ${jokerText()}`;
     case 'attack':
       return 'ATTACK ⚔';
     case 'flip':

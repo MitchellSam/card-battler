@@ -83,7 +83,7 @@ export function describeEvent(e: GameEvent, resolve?: UidResolver): string {
     case 'SpellActivated':
       return `${p} flip${s(e)} the set ${cardName(e.cardId)} — ${effectName(e)}${amountNote(e)}.`;
     case 'JokerCast':
-      return `${p} cast${s(e)} a Joker (draw 2).`;
+      return `${p} cast${s(e)} a Joker — ${describeEffect('default:JOKER').text}`;
     case 'StackResolved':
       return `Stack: ${String(e.kind)} resolves.`;
     case 'EffectNegated':

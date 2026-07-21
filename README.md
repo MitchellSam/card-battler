@@ -13,6 +13,7 @@ house-ruling their own card game. Design docs:
 - [M4_DESIGN_RECOMMENDATIONS.md](M4_DESIGN_RECOMMENDATIONS.md) — Run-layer content + structure recommendations (ratified 2026-07-19 as the working set)
 - [M4_IMPLEMENTATION_BRIEF.md](M4_IMPLEMENTATION_BRIEF.md) — Run mode layer: effect framework, per-player config, node map, economy, persistence
 - [HANDOFF_M4.md](HANDOFF_M4.md) — implementation handoff for the M4 milestone (what shipped, what's next, gotchas)
+- [DECK_SYSTEMS_PLAN.md](DECK_SYSTEMS_PLAN.md) — architecture plan + decision record for future deck systems (tarot, mahjong, …) and pluggable win conditions; Phase 1 seam hardening is behavior-preserving, decks deferred
 - [RULES-GAPS.md](RULES-GAPS.md) — generated list of open rules questions found during implementation (decide with the designers)
 
 ## Layout

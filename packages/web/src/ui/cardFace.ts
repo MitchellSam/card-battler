@@ -46,6 +46,29 @@ function slotLine(label: string, card: GameCard): string {
   return eff === `default:${card.rank}` ? `${label}: ${d.text}` : `${label} [${d.name}]: ${d.text}`;
 }
 
+/** Default effects read as plain rules text; a covering sticker leads with its name. */
+function effectFragment(eff: string, isDefault: boolean): string {
+  const d = describeEffect(eff);
+  return isDefault ? d.text : `${d.name} — ${d.text}`;
+}
+
+/** Cast-button label fragment for a face card's RANK effect (sticker-aware). */
+export function rankCastLabel(card: GameCard): string {
+  const eff = effectiveCardEffect(card);
+  return effectFragment(eff, eff === `default:${card.rank}`);
+}
+
+/** Cast-button label fragment for a card's SUIT effect (Cheat-Sheet-sticker-aware). */
+export function suitCastLabel(card: GameCard, suitOverrides?: SuitOverrides): string {
+  const eff = effectiveSuitEffect(suitOverrides, card.owner, card.suit!);
+  return effectFragment(eff, eff === `default:${card.suit}`);
+}
+
+/** The Joker's rules text — engine-sourced, like every other effect. */
+export function jokerText(): string {
+  return describeEffect('default:JOKER').text;
+}
+
 /**
  * Hover-inspect text for a card, resolved through its EFFECTIVE effects.
  * `suitOverrides` is the duel's Cheat Sheet sticker state (view.suitOverrides)
