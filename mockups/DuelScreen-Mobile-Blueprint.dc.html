@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; }
+  @keyframes bpPulse { 0%,100%{ opacity:.55 } 50%{ opacity:1 } }
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0d3b66;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:28px 28px;font-family:'IBM Plex Mono',monospace;color:#dbeafe;padding:40px 32px 80px;box-sizing:border-box;">
+
+  <div style="max-width:1180px;margin:0 auto 30px;">
+    <div style="font-size:12px;letter-spacing:.35em;color:#7fb3e8;">BLUEPRINT — v2 · LANDSCAPE PHONE · 844×390 · NOT ART</div>
+    <h1 style="font-family:'Architects Daughter',cursive;font-size:40px;margin:6px 0 4px;color:#fff;font-weight:400;">Duel Screen — Mobile Zoning</h1>
+    <div style="font-size:13px;color:#9fc4e8;max-width:760px;line-height:1.5;">Applying the GDKeys / Fairtravel principles: tight hero corners, condensed board tiles, 60/40 asymmetric split, left=past · right=future, defined zones. All 9 numbered principles ➊–➒ map to the rules key.</div>
+  </div>
+
+  <!-- PHONE FRAME -->
+  <div style="max-width:1180px;margin:0 auto;display:flex;gap:34px;align-items:flex-start;flex-wrap:wrap;">
+
+    <div style="flex:1 1 720px;min-width:640px;position:relative;">
+      <!-- landscape phone bezel -->
+      <div style="position:relative;background:#0a2c4d;border:3px solid #4a7cae;border-radius:34px;padding:16px 40px;box-shadow:0 0 0 6px #072138;">
+        <!-- camera -->
+        <div style="position:absolute;left:16px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:#4a7cae;"></div>
+
+        <!-- SCREEN -->
+        <div style="position:relative;aspect-ratio:19.5/9;border:1.5px dashed #5b8fc4;border-radius:12px;display:grid;grid-template-columns:74px 1fr 118px;grid-template-rows:1fr;overflow:hidden;">
+
+          <!-- LOG DRAWER (ghost — slides over board from left when opened) -->
+          <div style="position:absolute;left:74px;top:0;bottom:0;width:150px;z-index:5;background:rgba(10,44,77,.92);border-right:2px solid #f4a259;padding:8px 8px;box-sizing:border-box;">
+            <div style="font-size:8px;color:#ffd9b0;font-weight:600;letter-spacing:.1em;">◂ ACTION LOG (text)</div>
+            <div style="font-size:6.5px;color:#9fc4e8;margin-top:6px;line-height:1.7;">
+              T7 · You played K♠ NEGATE<br>
+              T7 · Riley's J♥ DESTROY negated<br>
+              T6 · You banked 9♦<br>
+              T6 · Riley flipped 4♣ (trap)<br>
+              T5 · You fused → 11
+            </div>
+            <div style="position:absolute;bottom:6px;left:8px;font-size:6px;color:#f4a259;">tap LOG btn to toggle · scrollable</div>
+          </div>
+
+          <!-- LEFT RAIL = PAST + HERO CORNERS -->
+          <div style="border-right:1.5px dashed #5b8fc4;display:flex;flex-direction:column;">
+            <!-- Riley hero corner -->
+            <div style="flex:1;border-bottom:1.5px dashed #38618c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:5px 4px;">
+              <div style="display:flex;align-items:center;gap:3px;">
+                <div style="width:14px;height:14px;border-radius:50%;border:1.5px solid #9fc4e8;"></div>
+                <div style="font-size:7px;color:#9fc4e8;text-align:left;line-height:1.2;">RILEY<br>14/52</div>
+              </div>
+              <div style="display:flex;gap:3px;">
+                <div style="width:22px;height:16px;border:1.5px solid #9fc4e8;border-radius:2px;"></div>
+                <div style="width:22px;height:16px;border:1.5px solid #6f9fd0;border-radius:2px;background:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(159,196,232,.25) 3px,rgba(159,196,232,.25) 5px);"></div>
+              </div>
+              <div style="width:46px;height:14px;border:1px dashed #6f9fd0;border-radius:2px;"></div>
+              <div style="font-size:6.5px;color:#9fc4e8;text-align:center;">deck · GY · bank</div>
+            </div>
+            <!-- You hero corner -->
+            <div style="flex:1.15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:5px 4px;">
+              <div style="display:flex;align-items:center;gap:3px;">
+                <div style="width:16px;height:16px;border-radius:50%;border:1.5px solid #fff;"></div>
+                <div style="font-size:7px;color:#fff;text-align:left;line-height:1.2;font-weight:600;">YOU<br>21/52</div>
+              </div>
+              <div style="display:flex;gap:3px;">
+                <div style="width:26px;height:20px;border:2px solid #fff;border-radius:2px;"></div>
+                <div style="width:26px;height:20px;border:2px solid #cfe2f7;border-radius:2px;background:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(255,255,255,.28) 3px,rgba(255,255,255,.28) 5px);"></div>
+              </div>
+              <div style="width:52px;height:18px;border:1.5px solid #fff;border-radius:2px;"></div>
+              <div style="font-size:6.5px;color:#fff;text-align:center;font-weight:600;">deck · GY · BANK</div>
+            </div>
+          </div>
+
+          <!-- CENTER = BOARD -->
+          <div style="display:flex;flex-direction:column;position:relative;">
+            <!-- Riley's hand (was info bar) -->
+            <div style="height:15%;border-bottom:1.5px dashed #38618c;display:flex;align-items:center;justify-content:center;gap:3px;padding:0 8px;overflow:hidden;">
+              <div style="width:18px;height:22px;border:1px solid #9fc4e8;border-radius:2px;margin-bottom:-8px;transform:rotate(6deg);"></div><div style="width:18px;height:24px;border:1px solid #9fc4e8;border-radius:2px;margin-bottom:-10px;transform:rotate(2deg);"></div><div style="width:18px;height:24px;border:1px solid #9fc4e8;border-radius:2px;margin-bottom:-10px;transform:rotate(-2deg);"></div><div style="width:18px;height:22px;border:1px solid #9fc4e8;border-radius:2px;margin-bottom:-8px;transform:rotate(-6deg);"></div>
+              <div style="font-size:7px;color:#9fc4e8;margin-left:6px;">RILEY'S HAND (smaller than yours)</div>
+            </div>
+            <!-- opponent board 40% : SEPARATE rows -->
+            <div style="height:32%;display:flex;flex-direction:column;justify-content:center;gap:3px;padding:4px 8px;background:rgba(0,0,0,.12);">
+              <div style="display:flex;gap:4px;justify-content:center;">
+                <div style="width:26px;height:18px;border:1px solid #7fb3e8;border-radius:2px;"></div><div style="width:26px;height:18px;border:1px solid #7fb3e8;border-radius:2px;"></div><div style="width:26px;height:18px;border:1px solid #7fb3e8;border-radius:2px;"></div><div style="width:26px;height:18px;border:1px dashed #4a7cae;border-radius:2px;"></div><div style="width:26px;height:18px;border:1px dashed #4a7cae;border-radius:2px;"></div>
+              </div>
+              <div style="display:flex;gap:4px;justify-content:center;">
+                <div style="width:26px;height:15px;border:1px solid #4a7cae;border-radius:2px;background:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(127,179,232,.18) 3px,rgba(127,179,232,.18) 5px);"></div><div style="width:26px;height:15px;border:1px dashed #4a7cae;border-radius:2px;"></div><div style="width:26px;height:15px;border:1px dashed #4a7cae;border-radius:2px;"></div><div style="width:26px;height:15px;border:1px dashed #4a7cae;border-radius:2px;"></div><div style="width:26px;height:15px;border:1px dashed #4a7cae;border-radius:2px;"></div>
+              </div>
+              <div style="font-size:7px;color:#7fb3e8;text-align:center;">opp mon row + spell/trap row — mirrored, kept separate (40%)</div>
+            </div>
+            <!-- persistent TIMELINE band (present seam) — phase-coded, always visible -->
+            <div style="height:14%;border-top:1.5px dotted #f4a259;border-bottom:1.5px dotted #f4a259;display:flex;align-items:stretch;">
+              <!-- log button = stack of cards, actions land here -->
+              <div style="flex:0 0 auto;display:flex;align-items:center;gap:4px;padding:0 6px;border-right:1.5px solid #f4a259;">
+                <div style="position:relative;width:26px;height:22px;">
+                  <div style="position:absolute;left:0;top:2px;width:17px;height:17px;border:1px solid #f4a259;border-radius:2px;transform:rotate(-8deg);"></div>
+                  <div style="position:absolute;left:3px;top:1px;width:17px;height:17px;border:1px solid #f4a259;border-radius:2px;transform:rotate(4deg);"></div>
+                  <div style="position:absolute;left:6px;top:0;width:17px;height:17px;border:1.5px solid #ffd9b0;border-radius:2px;"></div>
+                </div>
+                <div style="font-size:6px;color:#f4a259;line-height:1;">LOG<br>▸drawer</div>
+              </div>
+              <!-- PREVIOUS phase (older, heavier overlap) -->
+              <div style="flex:1;position:relative;background:rgba(120,160,210,.14);border-right:1.5px solid #7fb3e8;display:flex;align-items:center;padding:0 6px;">
+                <div style="position:absolute;top:1px;left:6px;font-size:5.5px;color:#7fb3e8;letter-spacing:.05em;">◂ MAIN PHASE 1 (prev)</div>
+                <div style="position:relative;height:16px;flex:1;">
+                  <div style="position:absolute;left:0;top:1px;width:14px;height:11px;border:1px solid #7fb3e8;border-radius:2px;background:#0a2c4d;opacity:.5;"></div>
+                  <div style="position:absolute;left:6px;top:1px;width:14px;height:11px;border:1px solid #7fb3e8;border-radius:2px;background:#0a2c4d;opacity:.6;"></div>
+                  <div style="position:absolute;left:12px;top:1px;width:14px;height:11px;border:1px solid #7fb3e8;border-radius:2px;background:#0a2c4d;opacity:.7;"></div>
+                  <div style="position:absolute;left:22px;top:1px;width:14px;height:11px;border:1px solid #7fb3e8;border-radius:2px;background:#0a2c4d;opacity:.85;"></div>
+                </div>
+                <span style="font-size:5px;color:#7fb3e8;">heavier overlap = older</span>
+              </div>
+              <!-- CURRENT phase (newer, spread out, live stack) -->
+              <div style="flex:1.1;position:relative;background:rgba(244,162,89,.16);display:flex;align-items:center;padding:0 6px;">
+                <div style="position:absolute;top:1px;left:6px;font-size:5.5px;color:#ffd9b0;letter-spacing:.05em;">BATTLE PHASE (current · live stack) ▸</div>
+                <div style="position:relative;height:16px;flex:1;">
+                  <div style="position:absolute;left:0;top:1px;width:15px;height:12px;border:1px solid #f4a259;border-radius:2px;background:#0a2c4d;"></div>
+                  <div style="position:absolute;left:16px;top:1px;width:15px;height:12px;border:1px solid #f4a259;border-radius:2px;background:#0a2c4d;"></div>
+                  <div style="position:absolute;left:34px;top:0;width:17px;height:14px;border:1.5px solid #ffd9b0;border-radius:2px;background:#0a2c4d;animation:bpPulse 1.8s infinite;"></div>
+                </div>
+                <span style="font-size:5px;color:#ffd9b0;">less overlap = newer</span>
+              </div>
+            </div>
+            <!-- your board 60% -->
+            <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:6px;padding:6px 8px;background:rgba(255,255,255,.06);">
+              <div style="display:flex;gap:6px;justify-content:center;">
+                <div style="width:38px;height:30px;border:2px solid #fff;border-radius:3px;"></div><div style="width:38px;height:30px;border:2px solid #fff;border-radius:3px;"></div><div style="width:38px;height:30px;border:2px solid #fff;border-radius:3px;"></div><div style="width:38px;height:30px;border:2px dashed #9fc4e8;border-radius:3px;"></div><div style="width:38px;height:30px;border:2px dashed #9fc4e8;border-radius:3px;"></div>
+              </div>
+              <div style="display:flex;gap:6px;justify-content:center;">
+                <div style="width:38px;height:26px;border:1.5px solid #cfe2f7;border-radius:3px;"></div><div style="width:38px;height:26px;border:1.5px solid #cfe2f7;border-radius:3px;"></div><div style="width:38px;height:26px;border:1.5px dashed #9fc4e8;border-radius:3px;"></div><div style="width:38px;height:26px;border:1.5px dashed #9fc4e8;border-radius:3px;"></div><div style="width:38px;height:26px;border:1.5px dashed #9fc4e8;border-radius:3px;"></div>
+              </div>
+              <div style="font-size:8px;color:#fff;text-align:center;font-weight:600;">YOUR mon row + spell/trap row — bigger tiles (60%)</div>
+            </div>
+            <!-- your hand -->
+            <div style="height:16%;border-top:1.5px dashed #5b8fc4;display:flex;align-items:center;justify-content:center;gap:3px;">
+              <div style="width:24px;height:34px;border:1.5px solid #fff;border-radius:3px;margin-top:-14px;transform:rotate(-8deg);"></div><div style="width:24px;height:36px;border:1.5px solid #fff;border-radius:3px;margin-top:-16px;transform:rotate(-3deg);"></div><div style="width:24px;height:38px;border:1.5px solid #fff;border-radius:3px;margin-top:-18px;"></div><div style="width:24px;height:36px;border:1.5px solid #fff;border-radius:3px;margin-top:-16px;transform:rotate(3deg);"></div><div style="width:24px;height:34px;border:1.5px solid #fff;border-radius:3px;margin-top:-14px;transform:rotate(8deg);"></div>
+              <div style="font-size:8px;color:#fff;margin-left:8px;">YOUR HAND (fanned, tap=zoom)</div>
+            </div>
+          </div>
+
+          <!-- RIGHT RAIL = FUTURE / THUMB -->
+          <div style="border-left:1.5px dashed #5b8fc4;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 6px;">
+            <div style="font-size:8px;color:#9fc4e8;text-align:center;">☰ menu · cheat</div>
+            <!-- selected-card detail panel -->
+            <div style="width:100%;flex:1;border:1.5px dashed #7fb3e8;border-radius:6px;padding:5px;display:flex;flex-direction:column;gap:3px;">
+              <div style="width:100%;height:22px;border:1px solid #cfe2f7;border-radius:2px;"></div>
+              <div style="font-size:7px;color:#fff;font-weight:600;text-align:center;">SELECTED CARD</div>
+              <div style="height:2px;"></div>
+              <div style="width:100%;height:3px;border-radius:2px;background:rgba(159,196,232,.4);"></div>
+              <div style="width:80%;height:3px;border-radius:2px;background:rgba(159,196,232,.4);"></div>
+              <div style="width:90%;height:3px;border-radius:2px;background:rgba(159,196,232,.4);"></div>
+              <div style="font-size:6.5px;color:#9fc4e8;text-align:center;margin-top:auto;line-height:1.3;">rank·suit · type ·<br>effect · buffs · stickers</div>
+            </div>
+            <div style="width:76px;border:1.5px dashed #f4a259;border-radius:6px;padding:6px 4px;text-align:center;">
+              <div style="font-size:8px;color:#f4a259;line-height:1.3;">FORCED<br>CHOICE /<br>POLY</div>
+            </div>
+            <div style="width:80px;height:44px;border:2px solid #f4a259;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(244,162,89,.12);">
+              <div style="font-size:9px;color:#ffd9b0;font-weight:600;text-align:center;">END<br>TURN ▸</div>
+            </div>
+            <div style="font-size:7px;color:#7fb3e8;text-align:center;">right-thumb<br>zone</div>
+          </div>
+
+        </div>
+      </div>
+      <div style="text-align:center;font-size:11px;color:#7fb3e8;margin-top:10px;">◄ 19.5 : 9  landscape · one-hand-and-thumb reach ►</div>
+    </div>
+
+    <!-- PRINCIPLE KEY -->
+    <div style="flex:1 1 300px;min-width:280px;">
+      <div style="font-size:12px;letter-spacing:.3em;color:#7fb3e8;margin-bottom:12px;">ZONING RULES APPLIED</div>
+      <sc-for list="{{ rules }}" as="r" hint-placeholder-count="8">
+        <div style="display:flex;gap:10px;margin-bottom:13px;align-items:flex-start;">
+          <div style="flex:0 0 auto;width:20px;height:20px;border:1.5px solid #f4a259;border-radius:50%;color:#f4a259;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:600;">{{ r.n }}</div>
+          <div style="font-size:12px;line-height:1.45;"><span style="color:#fff;font-weight:600;">{{ r.t }}</span> <span style="color:#9fc4e8;">{{ r.d }}</span></div>
+        </div>
+      </sc-for>
+      <div style="margin-top:18px;border-top:1px dashed #38618c;padding-top:14px;font-size:11px;color:#9fc4e8;line-height:1.5;">
+        <div style="color:#6ee7a8;font-weight:600;margin-bottom:6px;">✓ CONFIRMED</div>
+        • <b style="color:#fff;">Canvas = 844×390</b> (real 19.5:9 phone in landscape, 1 design px = 1 physical px; desktop preview scales UP). The old 1560×720 canvas rendered at ~0.54× on-device and misled sizing.<br>
+        • <b style="color:#fff;">Size floors</b> (now true physical px, inherited by screens 2–6): every tappable ≥ <b style="color:#fff;">44×44</b> effective (incl. exposed area of fanned cards); body/effect text ≥ 12px; secondary labels ≥ 10px; priority indicator ≥ 15px. Resolve tightness by cutting/condensing, never by going below the floors.<br>
+        • <b style="color:#fff;">Tap</b> = detail in right panel · <b style="color:#fff;">long-press</b> = big zoom (dismiss on release) · desktop = hotkey toggle.<br>
+        • Timeline: <b style="color:#fff;">phase-coded</b> bg + dividers (Draw · Main 1 · Battle · Main 2 · End). Only prev + current phase shown; older → into LOG stack.<br>
+        • <b style="color:#fff;">No thumbnail limit</b> — icons overlap; heavier overlap = older, lighter = newer.<br>
+        • Opponent field <b style="color:#fff;">always visible</b>.<br>
+        • Timeline band <b style="color:#fff;">always visible</b>.<br>
+        • Aesthetic stays "desk paper" — this is wireframe only.
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      rules: [
+        { n:"1", t:"Fantasy stays.", d:"Desk-paper metaphor is the anchor — spend space on it deliberately, don't strip it." },
+        { n:"2", t:"Tight hero corners.", d:"Each player's deck·graveyard·bank collapse into one left-rail cluster, not stretched edges." },
+        { n:"3", t:"Board cards = square tiles.", d:"On-board monsters/spells condense to rank+suit tiles; tap to expand to full card." },
+        { n:"4", t:"60/40 asymmetric split.", d:"Your field bigger (bottom 60%), Riley's condensed on top (40%) — feel in control." },
+        { n:"5", t:"Past ◄ ► Future.", d:"Decks/graveyard left, board center, End-Turn + forced-choice right (thumb)." },
+        { n:"6", t:"Defined zones.", d:"Two bounded rows per side make the 5-zone limit obvious even at tile size." },
+        { n:"7", t:"Cut duplicate info.", d:"Deck-as-HP is the dominant stat; drop floaty/redundant readouts." },
+        { n:"8", t:"Pop the essentials.", d:"Rank+suit huge; distinct paper-color per monster / spell / trap category." },
+        { n:"9", t:"Timeline seam.", d:"Always-on center band, phase-coded (Draw·Main1·Battle·Main2·End) with only prev+current phase shown. Actions overlap (older = more), slide left into the LOG stack button, which opens a text-log drawer. Doubles as the live resolution stack." }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

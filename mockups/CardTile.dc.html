@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Patrick+Hand&family=Gochi+Hand&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box}</style>
+</helmet>
+<div style="position:relative;width:100%;height:100%;border-radius:6px;background:{{ bg }};box-shadow:0 2px 3px rgba(0,0,0,.22),inset 0 0 0 1.5px rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center">
+  <sc-if value="{{ faceUp }}" hint-placeholder-val="{{ true }}">
+    <div style="width:66%;height:82%;background:#fbfaf3;border:1.5px solid #2b2b2b;border-radius:4px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Permanent Marker';font-size:{{ rankFs }}px;color:{{ suitColor }};line-height:1">{{ rankSuit }}</span></div>
+  </sc-if>
+  <sc-if value="{{ faceDown }}" hint-placeholder-val="{{ false }}">
+    <div style="width:66%;height:82%;border-radius:4px;border:2px solid #f4efe0;background-color:#b8503f;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 4px,transparent 4px 9px),repeating-linear-gradient(-45deg,rgba(0,0,0,.10) 0 4px,transparent 4px 9px);display:flex;align-items:center;justify-content:center"><span style="font-family:'Permanent Marker';color:#f7f2e2;font-size:{{ starFs }}px;transform:rotate(-9deg)">★</span></div>
+  </sc-if>
+  <sc-if value="{{ hasPos }}" hint-placeholder-val="{{ true }}">
+    <span style="position:absolute;top:2px;left:4px;font-family:'Gochi Hand';font-size:{{ posFs }}px;color:{{ labelColor }};line-height:1">{{ pos }}</span>
+  </sc-if>
+  <sc-if value="{{ hasMark }}" hint-placeholder-val="{{ false }}">
+    <span style="position:absolute;top:1px;right:4px;font-family:'Permanent Marker';font-size:{{ markFs }}px;color:#8f3f74">✦</span>
+  </sc-if>
+  <sc-if value="{{ hasBadge }}" hint-placeholder-val="{{ false }}">
+    <span style="position:absolute;bottom:-6px;right:-6px;font-family:'Permanent Marker';font-size:{{ badgeFs }}px;color:#fff;background:{{ badgeColor }};min-width:{{ badgeMin }}px;height:{{ badgeH }}px;padding:0 2px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff">{{ badge }}</span>
+  </sc-if>
+  <sc-if value="{{ selected }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:-3px;border:2.5px solid #C23B2E;border-radius:62% 38% 55% 45%/48% 57% 43% 52%;transform:rotate(-2deg);pointer-events:none;box-shadow:0 0 0 1px rgba(194,59,46,.25)"></div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:56,&quot;height&quot;:56},&quot;rank&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;6&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;suit&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;♣&quot;,&quot;options&quot;:[&quot;♠&quot;,&quot;♥&quot;,&quot;♦&quot;,&quot;♣&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;category&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;monster&quot;,&quot;options&quot;:[&quot;monster&quot;,&quot;spell&quot;,&quot;trap&quot;,&quot;neutral&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;faceDown&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;pos&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;⚔ATK&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;badge&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;6&quot;,&quot;tsType&quot;:&quot;string | number&quot;},&quot;badgeColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#C23B2E&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;mark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;selected&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;scale&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.6,&quot;max&quot;:2,&quot;step&quot;:0.05,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const cat = this.props.category || 'neutral';
+    const suit = this.props.suit || '';
+    const isRed = suit === '♥' || suit === '♦';
+    const faceDown = !!this.props.faceDown;
+    const bgByCat = {
+      monster: '#d68b73', spell: '#8fa9c9', trap: '#b79ccb', neutral: '#9fb0c6'
+    };
+    const labelByCat = {
+      monster: '#5a2a1e', spell: '#2f4257', trap: '#4a2d63', neutral: '#2f4257'
+    };
+    const badge = this.props.badge;
+    const scale = this.props.scale != null ? this.props.scale : 1;
+    return {
+      rankFs: Math.round(18 * scale), posFs: Math.max(8, Math.round(10 * scale)),
+      badgeFs: Math.round(12 * scale), badgeMin: Math.round(20 * scale), badgeH: Math.round(20 * scale),
+      markFs: Math.round(11 * scale), starFs: Math.round(16 * scale),
+      bg: bgByCat[cat] || bgByCat.neutral,
+      labelColor: labelByCat[cat] || labelByCat.neutral,
+      faceDown, faceUp: !faceDown,
+      rankSuit: (this.props.rank || '') + suit,
+      suitColor: isRed ? '#c0392b' : '#242b3a',
+      hasPos: !!this.props.pos, pos: this.props.pos || '',
+      hasMark: !!this.props.mark,
+      hasBadge: badge != null && badge !== '', badge,
+      badgeColor: this.props.badgeColor || '#C23B2E',
+      selected: !!this.props.selected
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Patrick+Hand&family=Gochi+Hand&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#7d6f52;font-family:'Patrick Hand',cursive}
+  a{color:#2B4C9B;text-decoration:none}a:hover{color:#1F1D1B}
+  @keyframes glowpulse{0%,100%{box-shadow:0 0 3px rgba(244,224,77,.45),0 3px 6px rgba(0,0,0,.35)}50%{box-shadow:0 0 22px rgba(244,224,77,.95),0 3px 6px rgba(0,0,0,.35)}}
+</style>
+</helmet>
+<div onClick="{{ bgClick }}" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background-color:#b8a67f;background-image:radial-gradient(130% 120% at 50% 25%,rgba(255,255,255,.07),rgba(0,0,0,.22)),repeating-linear-gradient(91deg,rgba(0,0,0,.045) 0 2px,transparent 2px 46px),repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0 1px,transparent 1px 9px)">
+  <div style="width:1600px;height:900px;position:relative;transform:scale({{ boardScale }});transform-origin:center;flex:none;display:flex;flex-direction:column;padding:14px 22px 18px">
+
+    <!-- ===== TOP STRIP : turn / phase / nav ===== -->
+    <div style="height:52px;flex:none;display:flex;align-items:center;gap:14px">
+      <div style="font-family:'Permanent Marker';font-size:20px;color:#F5EED8;background:#2B4C9B;padding:6px 15px;border-radius:3px;transform:rotate(-1.4deg);box-shadow:0 2px 4px rgba(0,0,0,.35)">YOUR TURN <span style="font-family:'Patrick Hand';font-size:14px;opacity:.85">· turn 7</span></div>
+      <div style="display:flex;align-items:center;gap:7px;background:rgba(245,238,216,.92);padding:6px 13px;border-radius:4px;transform:rotate(.5deg);box-shadow:0 2px 4px rgba(0,0,0,.25)">
+        <span style="font-family:'Gochi Hand';font-size:14px;color:#8B8578">PHASE:</span>
+        <span style="font-size:15px;color:#a59b83">Main 1</span><span style="color:#c3b997">›</span>
+        <span style="font-family:'Permanent Marker';font-size:16px;color:#fff;background:#C23B2E;padding:1px 9px;border-radius:3px;transform:rotate(-2deg);display:inline-block">BATTLE</span>
+        <span style="color:#c3b997">›</span><span style="font-size:15px;color:#a59b83">Main 2</span>
+        <span style="color:#c3b997">›</span><span style="font-size:15px;color:#a59b83">End</span>
+      </div>
+      <div style="font-family:'Gochi Hand';font-size:14px;color:#5a2a1e;background:#e6a793;padding:4px 11px;border-radius:3px;transform:rotate(-1deg);box-shadow:0 1px 3px rgba(0,0,0,.2)">Normal Summon: <b style="font-family:'Permanent Marker';color:#C23B2E">USED ✗</b></div>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <a href="DuelScreen-v2.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#F5EED8;background:#C23B2E;padding:5px 10px;border-radius:2px;transform:rotate(-2deg);box-shadow:0 2px 3px rgba(0,0,0,.3)">Duel</a>
+        <a href="DuelScreen-Mobile.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 10px;border-radius:2px;transform:rotate(1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Mobile</a>
+        <a href="CardAnatomy.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 10px;border-radius:2px;transform:rotate(-1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Anatomy</a>
+        <a href="NodeMap.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 10px;border-radius:2px;transform:rotate(1.5deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Map</a>
+        <a href="Shop.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 10px;border-radius:2px;transform:rotate(-1.5deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Shop</a>
+        <a href="CheatSheet.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 10px;border-radius:2px;transform:rotate(1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Rules</a>
+        <a href="RunSummary.dc.html" style="font-family:'Permanent Marker';font-size:13px;color:#3a2f14;background:#E7D7A9;padding:5px 10px;border-radius:2px;transform:rotate(-1deg);box-shadow:0 2px 3px rgba(0,0,0,.25)">Summary</a>
+      </div>
+    </div>
+
+    <!-- ===== BOARD ROW ===== -->
+    <div style="flex:1;display:flex;gap:14px;min-height:0">
+
+      <!-- ============ LEFT RAIL : hero corners (past) + persistent LOG ============ -->
+      <div style="width:346px;flex:none;display:flex;flex-direction:column;gap:9px;min-height:0">
+        <!-- RILEY corner -->
+        <div style="flex:none;background:rgba(90,78,53,.16);border:2px dashed #6b5f45;border-radius:8px;padding:9px 11px;display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:34px;height:34px;border-radius:50%;background:#a9b6cc;border:2.5px solid #5a4e35;display:flex;align-items:center;justify-content:center;font-family:'Permanent Marker';font-size:16px;color:#2f4257">R</div>
+            <div style="line-height:1.05"><div style="font-family:'Permanent Marker';font-size:17px;color:#C23B2E">RILEY</div><div style="font-family:'Gochi Hand';font-size:12px;color:#5a4e35">opponent</div></div>
+            <div style="flex:1"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+              <div style="position:relative;width:44px;height:60px">
+                <div style="position:absolute;top:3px;left:3px;width:41px;height:57px;border-radius:4px;background:#a8452f;border:1.5px solid #2b2b2b"></div>
+                <div style="position:absolute;top:0;left:0;width:41px;height:57px"><dc-import name="Card" face-down="{{ true }}" scale="0.68" style="width:41px;height:57px" hint-size="41px,57px"></dc-import></div>
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><span style="font-family:'Permanent Marker';font-size:22px;color:#fff;text-shadow:0 0 3px #000,1px 1px 0 rgba(0,0,0,.5)">14</span></div>
+              </div>
+              <div style="width:46px;height:8px;background:#5a4e35;border-radius:5px;overflow:hidden"><div style="width:27%;height:100%;background:#e0a53c"></div></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div onMouseEnter="{{ h.rileyGrave.enter }}" onMouseLeave="{{ h.rileyGrave.leave }}" onClick="{{ h.rileyGrave.click }}" style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;user-select:none">
+              <div style="position:relative;width:56px;height:66px">
+                <div style="position:absolute;inset:0;border:2px dashed #6b5f45;border-radius:6px;background:rgba(90,78,53,.15)"></div>
+                <div style="position:absolute;top:4px;left:8px;width:40px;height:58px"><dc-import name="Card" rank="J" suit="♦" scale="0.66" style="width:40px;height:58px" hint-size="40px,58px"></dc-import></div>
+                <span style="position:absolute;bottom:-5px;right:-5px;font-family:'Permanent Marker';font-size:11px;color:#fff;background:#5a4e35;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center">12</span>
+                <sc-if value="{{ selFlags.rileyGrave }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:-3px;border:3px solid #C23B2E;border-radius:62% 38% 55% 45%/48% 57% 43% 52%;transform:rotate(-2deg);pointer-events:none"></div></sc-if>
+              </div>
+              <span style="font-family:'Gochi Hand';font-size:11px;color:#4a3f28">GRAVE</span>
+            </div>
+            <div onMouseEnter="{{ h.rileyBank.enter }}" onMouseLeave="{{ h.rileyBank.leave }}" onClick="{{ h.rileyBank.click }}" style="flex:1;cursor:pointer;user-select:none;position:relative">
+              <div style="font-family:'Permanent Marker';font-size:11px;color:#C23B2E;margin-bottom:3px">BANK <span style="font-family:'Patrick Hand';color:#7d7150">(public)</span></div>
+              <div style="background:#E7D7A9;border-radius:5px;padding:5px 6px;display:flex;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.3)">
+                <div style="width:34px;height:48px;margin-right:-6px;transform:rotate(-3deg)"><dc-import name="Card" rank="Q" suit="♠" scale="0.56" style="width:34px;height:48px" hint-size="34px,48px"></dc-import></div>
+                <div style="width:34px;height:48px;margin-right:-6px"><dc-import name="Card" rank="Q" suit="♦" scale="0.56" style="width:34px;height:48px" hint-size="34px,48px"></dc-import></div>
+                <div style="width:34px;height:48px;margin-right:-6px;transform:rotate(3deg)"><dc-import name="Card" rank="7" suit="♣" scale="0.56" style="width:34px;height:48px" hint-size="34px,48px"></dc-import></div>
+                <div style="width:34px;height:48px;transform:rotate(-2deg)"><dc-import name="Card" rank="2" suit="♥" scale="0.56" style="width:34px;height:48px" hint-size="34px,48px"></dc-import></div>
+              </div>
+              <div style="font-family:'Gochi Hand';font-size:12px;color:#2B4C9B;margin-top:2px">🏆 Pair of Queens</div>
+              <sc-if value="{{ selFlags.rileyBank }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:-3px;border:3px solid #C23B2E;border-radius:7px;pointer-events:none"></div></sc-if>
+            </div>
+          </div>
+        </div>
+        <!-- YOU corner -->
+        <div style="flex:none;background:rgba(43,76,155,.13);border:2px solid #2B4C9B;border-radius:8px;padding:9px 11px;display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:38px;height:38px;border-radius:50%;background:#F4E04D;border:2.5px solid #2B4C9B;display:flex;align-items:center;justify-content:center;font-family:'Permanent Marker';font-size:18px;color:#2B4C9B">Y</div>
+            <div style="line-height:1.05"><div style="font-family:'Permanent Marker';font-size:19px;color:#2B4C9B">YOU</div><div style="font-family:'Gochi Hand';font-size:12px;color:#5a4e35">it's your move</div></div>
+            <div style="flex:1"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+              <div style="position:relative;width:48px;height:66px">
+                <div style="position:absolute;top:3px;left:3px;width:45px;height:63px;border-radius:4px;background:#a8452f;border:1.5px solid #2b2b2b"></div>
+                <div style="position:absolute;top:0;left:0;width:45px;height:63px"><dc-import name="Card" face-down="{{ true }}" scale="0.72" style="width:45px;height:63px" hint-size="45px,63px"></dc-import></div>
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><span style="font-family:'Permanent Marker';font-size:24px;color:#fff;text-shadow:0 0 3px #000,1px 1px 0 rgba(0,0,0,.5)">21</span></div>
+              </div>
+              <div style="width:50px;height:9px;background:#5a4e35;border-radius:5px;overflow:hidden"><div style="width:40%;height:100%;background:#7ba36f"></div></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div onMouseEnter="{{ h.youGrave.enter }}" onMouseLeave="{{ h.youGrave.leave }}" onClick="{{ h.youGrave.click }}" style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;user-select:none">
+              <div style="position:relative;width:56px;height:70px">
+                <div style="position:absolute;inset:0;border:2px dashed #6b5f45;border-radius:6px;background:rgba(90,78,53,.15)"></div>
+                <div style="position:absolute;top:4px;left:8px;width:42px;height:62px"><dc-import name="Card" rank="8" suit="♦" scale="0.68" style="width:42px;height:62px" hint-size="42px,62px"></dc-import></div>
+                <span style="position:absolute;bottom:-5px;right:-5px;font-family:'Permanent Marker';font-size:11px;color:#fff;background:#5a4e35;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center">9</span>
+                <sc-if value="{{ selFlags.youGrave }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:-3px;border:3px solid #C23B2E;border-radius:62% 38% 55% 45%/48% 57% 43% 52%;transform:rotate(-2deg);pointer-events:none"></div></sc-if>
+              </div>
+              <span style="font-family:'Gochi Hand';font-size:11px;color:#4a3f28">GRAVE</span>
+            </div>
+            <div onMouseEnter="{{ h.youBank.enter }}" onMouseLeave="{{ h.youBank.leave }}" onClick="{{ h.youBank.click }}" style="flex:1;cursor:pointer;user-select:none;position:relative">
+              <div style="font-family:'Permanent Marker';font-size:11px;color:#2B4C9B;margin-bottom:3px">YOUR BANK <span style="font-family:'Patrick Hand';color:#7d7150">(public)</span></div>
+              <div style="background:#E7D7A9;border-radius:5px;padding:5px 6px;display:flex;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.3)">
+                <div style="width:32px;height:46px;margin-right:-6px;transform:rotate(-4deg)"><dc-import name="Card" rank="A" suit="♠" scale="0.54" style="width:32px;height:46px" hint-size="32px,46px"></dc-import></div>
+                <div style="width:32px;height:46px;margin-right:-6px;transform:rotate(-2deg)"><dc-import name="Card" rank="K" suit="♦" scale="0.54" style="width:32px;height:46px" hint-size="32px,46px"></dc-import></div>
+                <div style="width:32px;height:46px;margin-right:-6px"><dc-import name="Card" rank="9" suit="♥" scale="0.54" style="width:32px;height:46px" hint-size="32px,46px"></dc-import></div>
+                <div style="width:32px;height:46px;margin-right:-6px;transform:rotate(2deg)"><dc-import name="Card" rank="9" suit="♠" scale="0.54" style="width:32px;height:46px" hint-size="32px,46px"></dc-import></div>
+                <div style="width:32px;height:46px;margin-right:-6px;transform:rotate(3deg)"><dc-import name="Card" rank="3" suit="♣" scale="0.54" style="width:32px;height:46px" hint-size="32px,46px"></dc-import></div>
+                <div style="width:32px;height:46px;transform:rotate(-2deg)"><dc-import name="Card" rank="6" suit="♦" scale="0.54" style="width:32px;height:46px" hint-size="32px,46px"></dc-import></div>
+              </div>
+              <div style="font-family:'Gochi Hand';font-size:12px;color:#2B4C9B;margin-top:2px">🏆 Pair of 9s</div>
+              <sc-if value="{{ selFlags.youBank }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:-3px;border:3px solid #C23B2E;border-radius:7px;pointer-events:none"></div></sc-if>
+            </div>
+          </div>
+        </div>
+        <!-- PERSISTENT ACTION LOG -->
+        <sc-if value="{{ showLog }}" hint-placeholder-val="{{ true }}">
+        <div onClick="{{ noop }}" style="flex:1;min-height:0;background-color:#F5EED8;background-image:repeating-linear-gradient(#F5EED8 0 23px,#e0d8bd 23px 24px);border-radius:8px;box-shadow:0 3px 6px rgba(0,0,0,.28);border-left:3px solid #f4a259;padding:9px 12px 10px;display:flex;flex-direction:column;min-height:0">
+          <div style="display:flex;align-items:center;gap:8px;flex:none;margin-bottom:4px">
+            <div style="position:relative;width:30px;height:26px;flex:none">
+              <div style="position:absolute;left:0;top:3px;width:19px;height:19px;border:1.5px solid #b56b2e;border-radius:3px;background:#f6d9b8;transform:rotate(-9deg)"></div>
+              <div style="position:absolute;left:4px;top:2px;width:19px;height:19px;border:1.5px solid #b56b2e;border-radius:3px;background:#f8e2c8;transform:rotate(4deg)"></div>
+              <div style="position:absolute;left:9px;top:0;width:19px;height:19px;border:2px solid #b56b2e;border-radius:3px;background:#fff;display:flex;align-items:center;justify-content:center;font-family:'Permanent Marker';font-size:12px;color:#b56b2e">≡</div>
+            </div>
+            <div style="font-family:'Permanent Marker';font-size:15px;color:#b56b2e">ACTION LOG</div>
+            <div style="flex:1"></div>
+            <span style="font-family:'Gochi Hand';font-size:11px;color:#8f8259">newest ↑</span>
+          </div>
+          <div style="flex:1;overflow-y:auto;min-height:0;padding-right:2px">
+            <sc-for list="{{ logEntries }}" as="e" hint-placeholder-count="8">
+              <div style="display:flex;gap:8px;font-family:'Patrick Hand';font-size:13px;color:#1F1D1B;line-height:1.25;padding:3px 0;border-bottom:1px dashed #d3c9a6">
+                <span style="font-family:'Permanent Marker';font-size:10px;color:#8f8259;flex:none;padding-top:1px">{{ e.t }}</span>
+                <span>{{ e.x }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+
+      <!-- ============ CENTER : BOARD ============ -->
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0;position:relative">
+
+        <!-- Riley's hand -->
+        <div style="height:44px;flex:none;display:flex;align-items:flex-start;justify-content:center;gap:0">
+          <div style="width:34px;height:46px;transform:rotate(-7deg);margin:0 -5px"><dc-import name="Card" face-down="{{ true }}" scale="0.52" style="width:34px;height:46px" hint-size="34px,46px"></dc-import></div>
+          <div style="width:34px;height:46px;transform:rotate(-2deg);margin:0 -5px"><dc-import name="Card" face-down="{{ true }}" scale="0.52" style="width:34px;height:46px" hint-size="34px,46px"></dc-import></div>
+          <div style="width:34px;height:46px;transform:rotate(3deg);margin:0 -5px"><dc-import name="Card" face-down="{{ true }}" scale="0.52" style="width:34px;height:46px" hint-size="34px,46px"></dc-import></div>
+          <div style="width:34px;height:46px;transform:rotate(8deg);margin:0 -5px"><dc-import name="Card" face-down="{{ true }}" scale="0.52" style="width:34px;height:46px" hint-size="34px,46px"></dc-import></div>
+          <span style="font-family:'Gochi Hand';font-size:12px;color:#F5EED8;background:#5a4e35;padding:1px 10px;border-radius:10px;align-self:center;margin-left:9px">RILEY'S HAND · 4</span>
+        </div>
+
+        <!-- RILEY FIELD (condensed 40% · spell/trap top · monsters near center) -->
+        <div style="flex:none;display:flex;flex-direction:column;gap:6px;align-items:center;padding:2px 0">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="writing-mode:vertical-rl;font-family:'Permanent Marker';font-size:12px;color:#4a2d63;letter-spacing:.03em">SPELL/TRAP</span>
+            <div style="display:flex;gap:8px">
+              <div onMouseEnter="{{ h.rileyTrap.enter }}" onMouseLeave="{{ h.rileyTrap.leave }}" onClick="{{ h.rileyTrap.click }}" style="width:64px;height:64px;cursor:pointer;user-select:none"><dc-import name="CardTile" rank="4" suit="♣" category="trap" pos="TRAP" selected="{{ selFlags.rileyTrap }}" scale="1.15" style="width:64px;height:64px" hint-size="64px,64px"></dc-import></div>
+              <div onMouseEnter="{{ h.rileyT2.enter }}" onMouseLeave="{{ h.rileyT2.leave }}" onClick="{{ h.rileyT2.click }}" style="width:64px;height:64px;cursor:pointer;user-select:none"><dc-import name="CardTile" category="neutral" face-down="{{ true }}" pos="SET" selected="{{ selFlags.rileyT2 }}" scale="1.15" style="width:64px;height:64px" hint-size="64px,64px"></dc-import></div>
+              <div onMouseEnter="{{ h.rileyT3.enter }}" onMouseLeave="{{ h.rileyT3.leave }}" onClick="{{ h.rileyT3.click }}" style="width:64px;height:64px;cursor:pointer;user-select:none"><dc-import name="CardTile" category="neutral" face-down="{{ true }}" pos="SET" selected="{{ selFlags.rileyT3 }}" scale="1.15" style="width:64px;height:64px" hint-size="64px,64px"></dc-import></div>
+              <div style="width:64px;height:64px;background:#a9b6cc;border-radius:7px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)"><span style="font-size:14px;color:rgba(47,66,87,.35)">·</span></div>
+              <div style="width:64px;height:64px;background:#a9b6cc;border-radius:7px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)"><span style="font-size:14px;color:rgba(47,66,87,.35)">·</span></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="writing-mode:vertical-rl;font-family:'Permanent Marker';font-size:12px;color:#5a2a1e;letter-spacing:.03em">MONSTERS</span>
+            <div style="display:flex;gap:8px">
+              <div style="width:64px;height:64px;background:#dc9a85;border-radius:7px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)"><span style="font-size:14px;color:rgba(90,42,30,.35)">·</span></div>
+              <div style="width:64px;height:64px;background:#dc9a85;border-radius:7px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)"><span style="font-size:14px;color:rgba(90,42,30,.35)">·</span></div>
+              <div onMouseEnter="{{ h.rileyM3.enter }}" onMouseLeave="{{ h.rileyM3.leave }}" onClick="{{ h.rileyM3.click }}" style="width:64px;height:64px;cursor:pointer;user-select:none"><dc-import name="CardTile" category="neutral" face-down="{{ true }}" pos="🛡SET" selected="{{ selFlags.rileyM3 }}" scale="1.15" style="width:64px;height:64px" hint-size="64px,64px"></dc-import></div>
+              <div onMouseEnter="{{ h.rileyM4.enter }}" onMouseLeave="{{ h.rileyM4.leave }}" onClick="{{ h.rileyM4.click }}" style="width:64px;height:64px;cursor:pointer;user-select:none"><dc-import name="CardTile" rank="6" suit="♣" category="monster" pos="🛡DEF" badge="6" badge-color="#2f6d4f" selected="{{ selFlags.rileyM4 }}" scale="1.15" style="width:64px;height:64px" hint-size="64px,64px"></dc-import></div>
+              <div style="width:64px;height:64px;background:#dc9a85;border-radius:7px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)"><span style="font-size:14px;color:rgba(90,42,30,.35)">·</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TIMELINE BAND (phase-coded · escalates the live stack · actions land in LOG anchor) -->
+        <div style="flex:none;height:132px;margin:8px 0;display:flex;border-top:2px dotted #f4a259;border-bottom:2px dotted #f4a259;background:rgba(0,0,0,.06)">
+          <!-- LOG anchor (visual only — actions land here; full log is the left panel) -->
+          <div style="flex:none;width:74px;background:rgba(244,162,89,.14);border-right:2px solid #f4a259;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+            <div style="position:relative;width:40px;height:34px">
+              <div style="position:absolute;left:0;top:4px;width:26px;height:26px;border:2px solid #b56b2e;border-radius:4px;background:#f6d9b8;transform:rotate(-9deg)"></div>
+              <div style="position:absolute;left:6px;top:2px;width:26px;height:26px;border:2px solid #b56b2e;border-radius:4px;background:#f8e2c8;transform:rotate(4deg)"></div>
+              <div style="position:absolute;left:12px;top:0;width:26px;height:26px;border:2.5px solid #b56b2e;border-radius:4px;background:#fff;display:flex;align-items:center;justify-content:center;font-family:'Permanent Marker';font-size:15px;color:#b56b2e">≡</div>
+            </div>
+            <span style="font-family:'Permanent Marker';font-size:11px;color:#b56b2e;text-align:center;line-height:1.1">actions<br>land here</span>
+          </div>
+          <!-- PREV phase -->
+          <div style="flex:1;position:relative;background:rgba(120,160,210,.16);border-right:2px solid #7fb3e8;display:flex;align-items:center;padding:0 12px">
+            <span style="position:absolute;top:4px;left:10px;font-family:'Permanent Marker';font-size:12px;color:#3f6fa0;letter-spacing:.03em">◂ MAIN PHASE 1</span>
+            <div style="position:relative;height:44px;flex:1;margin-top:16px">
+              <div style="position:absolute;left:0;top:10px;width:28px;height:22px;border:1.5px solid #3f6fa0;border-radius:4px;background:#dbe6f2;opacity:.5"></div>
+              <div style="position:absolute;left:16px;top:10px;width:28px;height:22px;border:1.5px solid #3f6fa0;border-radius:4px;background:#dbe6f2;opacity:.65"></div>
+              <div style="position:absolute;left:38px;top:6px;width:34px;height:26px;border:1.5px solid #3f6fa0;border-radius:4px;background:#eaf1f8;display:flex;align-items:center;justify-content:center;font-family:'Permanent Marker';font-size:14px;color:#242b3a">9♦</div>
+              <div style="position:absolute;left:80px;top:6px;width:34px;height:26px;border:1.5px solid #3f6fa0;border-radius:4px;background:#b8503f"></div>
+              <span style="position:absolute;left:122px;top:9px;font-family:'Patrick Hand';font-size:13px;color:#3f6fa0">bank 9♦ · flip 4♣</span>
+            </div>
+          </div>
+          <!-- CURRENT phase (ESCALATED live stack) -->
+          <div style="flex:1.9;position:relative;background:rgba(244,162,89,.2);display:flex;align-items:center;gap:10px;padding:22px 14px 10px;overflow:hidden">
+            <span style="position:absolute;top:4px;left:12px;font-family:'Permanent Marker';font-size:11px;color:#b56b2e;letter-spacing:.02em">BATTLE PHASE · LIVE STACK</span>
+            <span style="position:absolute;top:3px;right:12px;font-family:'Permanent Marker';font-size:18px;color:#fff;background:#C23B2E;padding:2px 12px;border-radius:12px;transform:rotate(-1deg);box-shadow:0 1px 3px rgba(0,0,0,.3);white-space:nowrap">⚡ Riley can respond… or pass</span>
+            <div onMouseEnter="{{ h.stackK.enter }}" onMouseLeave="{{ h.stackK.leave }}" onClick="{{ h.stackK.click }}" style="position:relative;cursor:pointer;user-select:none;flex:none">
+              <div style="position:relative;width:52px;height:72px;border-radius:6px;animation:glowpulse 1.8s ease-in-out infinite"><dc-import name="Card" rank="K" suit="♠" scale="0.85" style="width:52px;height:72px" hint-size="52px,72px"></dc-import><span style="position:absolute;top:-7px;left:-7px;font-family:'Permanent Marker';font-size:13px;color:#fff;background:#2B4C9B;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff">1</span><sc-if value="{{ selFlags.stackK }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:-4px;border:3px solid #C23B2E;border-radius:62% 38% 55% 45%/48% 57% 43% 52%;transform:rotate(-2deg);pointer-events:none"></div></sc-if></div>
+            </div>
+            <span style="font-family:'Permanent Marker';font-size:22px;color:#b56b2e;flex:none">→</span>
+            <div onMouseEnter="{{ h.stackJ.enter }}" onMouseLeave="{{ h.stackJ.leave }}" onClick="{{ h.stackJ.click }}" style="position:relative;cursor:pointer;user-select:none;opacity:.92;flex:none">
+              <div style="position:relative;width:52px;height:72px"><dc-import name="Card" rank="J" suit="♥" scale="0.85" style="width:52px;height:72px" hint-size="52px,72px"></dc-import><span style="position:absolute;top:-7px;left:-7px;font-family:'Permanent Marker';font-size:13px;color:#fff;background:#C23B2E;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff">2</span><sc-if value="{{ selFlags.stackJ }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:-4px;border:3px solid #C23B2E;border-radius:62% 38% 55% 45%/48% 57% 43% 52%;transform:rotate(-2deg);pointer-events:none"></div></sc-if></div>
+            </div>
+            <span style="font-family:'Patrick Hand';font-size:15px;color:#8a5a2e;line-height:1.2;flex:1"><b style="font-family:'Permanent Marker';color:#2B4C9B">K♠ NEGATE</b> resolves first → cancels their <b style="font-family:'Permanent Marker';color:#C23B2E">J♥ DESTROY</b>.</span>
+          </div>
+        </div>
+
+        <!-- YOUR FIELD (bigger 60% · monsters near center · spell/trap bottom) -->
+        <div style="flex:1;display:flex;flex-direction:column;gap:9px;align-items:center;justify-content:center;padding:2px 0;min-height:0">
+          <div style="display:flex;align-items:center;gap:11px">
+            <span style="writing-mode:vertical-rl;font-family:'Permanent Marker';font-size:13px;color:#5a2a1e;letter-spacing:.03em">MONSTERS</span>
+            <div style="display:flex;gap:10px">
+              <div style="width:84px;height:84px;background:#dc9a85;border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)"><span style="font-size:16px;color:rgba(90,42,30,.35)">·</span></div>
+              <div onMouseEnter="{{ h.you7h.enter }}" onMouseLeave="{{ h.you7h.leave }}" onClick="{{ h.you7h.click }}" style="width:84px;height:84px;cursor:pointer;user-select:none"><dc-import name="CardTile" rank="7" suit="♥" category="monster" pos="⚔ATK" badge="7" badge-color="#C23B2E" mark="{{ true }}" selected="{{ selFlags.you7h }}" scale="1.5" style="width:84px;height:84px" hint-size="84px,84px"></dc-import></div>
+              <div onMouseEnter="{{ h.you10s.enter }}" onMouseLeave="{{ h.you10s.leave }}" onClick="{{ h.you10s.click }}" style="width:84px;height:84px;cursor:pointer;user-select:none"><dc-import name="CardTile" rank="10" suit="♠" category="monster" pos="⚔ATK" badge="10" badge-color="#C23B2E" selected="{{ selFlags.you10s }}" scale="1.5" style="width:84px;height:84px" hint-size="84px,84px"></dc-import></div>
+              <div onMouseEnter="{{ h.youM4.enter }}" onMouseLeave="{{ h.youM4.leave }}" onClick="{{ h.youM4.click }}" style="width:84px;height:84px;cursor:pointer;user-select:none"><dc-import name="CardTile" category="neutral" face-down="{{ true }}" pos="🛡SET" selected="{{ selFlags.youM4 }}" scale="1.5" style="width:84px;height:84px" hint-size="84px,84px"></dc-import></div>
+              <div style="width:84px;height:84px;background:#dc9a85;border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)"><span style="font-size:16px;color:rgba(90,42,30,.35)">·</span></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:11px">
+            <span style="writing-mode:vertical-rl;font-family:'Permanent Marker';font-size:13px;color:#4a2d63;letter-spacing:.03em">SPELL/TRAP</span>
+            <div style="display:flex;gap:10px">
+              <div onMouseEnter="{{ h.youS1.enter }}" onMouseLeave="{{ h.youS1.leave }}" onClick="{{ h.youS1.click }}" style="width:84px;height:84px;cursor:pointer;user-select:none"><dc-import name="CardTile" category="neutral" face-down="{{ true }}" pos="SET" selected="{{ selFlags.youS1 }}" scale="1.5" style="width:84px;height:84px" hint-size="84px,84px"></dc-import></div>
+              <div style="width:84px;height:84px;background:#a9b6cc;border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)"><span style="font-size:16px;color:rgba(47,66,87,.35)">·</span></div>
+              <div style="width:84px;height:84px;background:#a9b6cc;border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)"><span style="font-size:16px;color:rgba(47,66,87,.35)">·</span></div>
+              <div style="width:84px;height:84px;background:#a9b6cc;border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)"><span style="font-size:16px;color:rgba(47,66,87,.35)">·</span></div>
+              <div style="width:84px;height:84px;background:#a9b6cc;border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18)"><span style="font-size:16px;color:rgba(47,66,87,.35)">·</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- YOUR HAND -->
+        <div style="flex:none;height:118px;display:flex;justify-content:center;align-items:flex-end;position:relative">
+          <span style="position:absolute;left:0;bottom:44px;font-family:'Permanent Marker';font-size:12px;color:#F5EED8;background:#2B4C9B;padding:2px 10px;border-radius:10px;transform:rotate(-2deg)">HAND · 5/6</span>
+          <div onMouseEnter="{{ h.hand9c.enter }}" onMouseLeave="{{ h.hand9c.leave }}" onClick="{{ h.hand9c.click }}" style="position:relative;width:76px;height:106px;transform:rotate(-11deg) translateY(14px);margin:0 -7px;cursor:pointer;user-select:none"><dc-import name="Card" rank="9" suit="♣" scale="1.25" style="width:76px;height:106px" hint-size="76px,106px"></dc-import><sc-if value="{{ selFlags.hand9c }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:-4px;border:3px solid #C23B2E;border-radius:60% 40% 55% 45%/48% 57% 43% 52%;transform:rotate(-2deg);pointer-events:none"></div></sc-if></div>
+          <div onMouseEnter="{{ h.hand4d.enter }}" onMouseLeave="{{ h.hand4d.leave }}" onClick="{{ h.hand4d.click }}" style="position:relative;width:76px;height:106px;transform:rotate(-5deg) translateY(3px);margin:0 -7px;cursor:pointer;user-select:none"><dc-import name="Card" rank="4" suit="♦" scale="1.25" style="width:76px;height:106px" hint-size="76px,106px"></dc-import><sc-if value="{{ selFlags.hand4d }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:-4px;border:3px solid #C23B2E;border-radius:60% 40% 55% 45%/48% 57% 43% 52%;transform:rotate(-2deg);pointer-events:none"></div></sc-if></div>
+          <div onMouseEnter="{{ h.handQh.enter }}" onMouseLeave="{{ h.handQh.leave }}" onClick="{{ h.handQh.click }}" style="position:relative;width:76px;height:106px;transform:rotate(0deg);margin:0 -7px;z-index:2;cursor:pointer;user-select:none"><dc-import name="Card" rank="Q" suit="♥" scale="1.25" style="width:76px;height:106px" hint-size="76px,106px"></dc-import><sc-if value="{{ selFlags.handQh }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:-4px;border:3px solid #C23B2E;border-radius:60% 40% 55% 45%/48% 57% 43% 52%;transform:rotate(-2deg);pointer-events:none"></div></sc-if></div>
+          <div onMouseEnter="{{ h.hand2s.enter }}" onMouseLeave="{{ h.hand2s.leave }}" onClick="{{ h.hand2s.click }}" style="position:relative;width:76px;height:106px;transform:rotate(5deg) translateY(3px);margin:0 -7px;cursor:pointer;user-select:none"><dc-import name="Card" rank="2" suit="♠" scale="1.25" style="width:76px;height:106px" hint-size="76px,106px"></dc-import><sc-if value="{{ selFlags.hand2s }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:-4px;border:3px solid #C23B2E;border-radius:60% 40% 55% 45%/48% 57% 43% 52%;transform:rotate(-2deg);pointer-events:none"></div></sc-if></div>
+          <div onMouseEnter="{{ h.handAd.enter }}" onMouseLeave="{{ h.handAd.leave }}" onClick="{{ h.handAd.click }}" style="position:relative;width:76px;height:106px;transform:rotate(11deg) translateY(14px);margin:0 -7px;cursor:pointer;user-select:none"><dc-import name="Card" rank="A" suit="♦" scale="1.25" style="width:76px;height:106px" hint-size="76px,106px"></dc-import><sc-if value="{{ selFlags.handAd }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:-4px;border:3px solid #C23B2E;border-radius:60% 40% 55% 45%/48% 57% 43% 52%;transform:rotate(-2deg);pointer-events:none"></div></sc-if></div>
+        </div>
+
+      </div>
+
+      <!-- ============ RIGHT RAIL : detail + actions + end turn (future) ============ -->
+      <div style="width:336px;flex:none;display:flex;flex-direction:column;gap:10px;min-height:0">
+        <button onClick="{{ openCheat }}" style="flex:none;font-family:'Permanent Marker';font-size:15px;color:#3a2f14;background:#F4E04D;border:none;border-radius:4px;padding:9px 0;cursor:pointer;box-shadow:0 3px 5px rgba(0,0,0,.3)">CHEAT SHEET</button>
+
+        <!-- SELECTED / HOVERED CARD DETAIL -->
+        <div onClick="{{ noop }}" style="flex:1;min-height:0;background-color:#F5EED8;background-image:repeating-linear-gradient(#F5EED8 0 25px,#e0d8bd 25px 26px);border-radius:7px;box-shadow:0 3px 6px rgba(0,0,0,.28);border-left:4px solid #b7ad8c;padding:13px 16px;display:flex;flex-direction:column;gap:9px;overflow-y:auto">
+          <div style="display:flex;align-items:center;gap:7px;flex:none">
+            <span style="font-family:'Gochi Hand';font-size:12px;color:#8f8259">click a card to pin it · hold Z to zoom</span>
+          </div>
+          <sc-if value="{{ noSel }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px">
+              <div style="width:58px;height:80px;border:2px dashed #c3b791;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Permanent Marker';font-size:30px;color:#cbbf9c;transform:rotate(-3deg)">?</div>
+              <div style="font-family:'Patrick Hand';font-size:16px;color:#8f8259;max-width:220px;line-height:1.3">Click any card to pin it here — its full effect, stickers and actions show up.</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;gap:12px;align-items:flex-start;flex:none">
+            <div style="width:74px;height:104px;flex:none">
+              <sc-if value="{{ sFaceDown }}" hint-placeholder-val="{{ false }}"><dc-import name="Card" face-down="{{ true }}" scale="1.22" style="width:74px;height:104px" hint-size="74px,104px"></dc-import></sc-if>
+              <sc-if value="{{ sFaceUp }}" hint-placeholder-val="{{ true }}"><dc-import name="Card" rank="{{ sRank }}" suit="{{ sSuit }}" scale="1.22" style="width:74px;height:104px" hint-size="74px,104px"></dc-import></sc-if>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-family:'Permanent Marker';font-size:28px;color:{{ sColor }};line-height:1">{{ sName }}</div>
+              <div style="display:inline-block;font-family:'Permanent Marker';font-size:12px;color:#fff;background:{{ sTypeColor }};padding:2px 9px;border-radius:3px;margin-top:5px">{{ sType }}</div>
+              <div style="font-family:'Gochi Hand';font-size:13px;color:#7d7150;margin-top:5px">{{ sPos }}</div>
+            </div>
+          </div>
+          <sc-if value="{{ sHasPower }}" hint-placeholder-val="{{ true }}">
+            <div style="font-family:'Patrick Hand';font-size:16px;color:#1F1D1B;flex:none"><b style="font-family:'Permanent Marker';color:#C23B2E">POWER {{ sPower }}</b> · {{ sMode }}</div>
+          </sc-if>
+          <div style="font-family:'Patrick Hand';font-size:16px;color:#1F1D1B;line-height:1.35;flex:none">{{ sEffect }}</div>
+          <sc-if value="{{ sHasStickers }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:none"><div style="font-family:'Permanent Marker';font-size:11px;color:#8f3f74;margin-bottom:4px">STICKERS</div>
+              <sc-for list="{{ sStickers }}" as="st" hint-placeholder-count="1"><div style="font-family:'Patrick Hand';font-size:14px;color:#5a2a1e;background:#F4E04D;border-radius:3px;padding:3px 9px;margin-bottom:4px;display:inline-block">✦ {{ st }}</div></sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ sHasBuffs }}" hint-placeholder-val="{{ false }}">
+            <div style="font-family:'Patrick Hand';font-size:14px;color:#2f6d4f;flex:none">▲ {{ sBuffs }}</div>
+          </sc-if>
+          </sc-if>
+        </div>
+
+        <!-- CONTEXT ACTIONS -->
+        <sc-if value="{{ sHasActions }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:none;display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ sActions }}" as="a" hint-placeholder-count="2">
+              <button onClick="{{ a.fn }}" style="font-family:'Permanent Marker';font-size:14px;color:#fff;background:{{ a.c }};border:none;border-radius:4px;padding:10px;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,.25)">{{ a.l }}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ note }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:none;font-family:'Patrick Hand';font-size:14px;color:#1F1D1B;background:rgba(245,238,216,.92);padding:6px 12px;border-radius:4px;text-align:center">{{ note }}</div>
+        </sc-if>
+
+        <!-- END TURN -->
+        <button onClick="{{ endTurn }}" style="flex:none;font-family:'Permanent Marker';font-size:20px;color:#fff;background:#C23B2E;border:none;border-radius:10px;padding:14px 0;cursor:pointer;box-shadow:0 4px 7px rgba(0,0,0,.32)">END TURN ▸</button>
+      </div>
+
+    </div>
+
+    <!-- ===== ZOOM OVERLAY (hover ≥ delay OR Z/Space) ===== -->
+    <sc-if value="{{ zoomOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:80;background:rgba(20,14,6,.74);display:flex;align-items:center;justify-content:center;gap:48px;padding:0 80px;pointer-events:none">
+        <div style="width:250px;height:350px;flex:none;filter:drop-shadow(0 10px 24px rgba(0,0,0,.5))">
+          <sc-if value="{{ zFaceDown }}" hint-placeholder-val="{{ false }}"><dc-import name="Card" face-down="{{ true }}" scale="4.1" style="width:250px;height:350px" hint-size="250px,350px"></dc-import></sc-if>
+          <sc-if value="{{ zFaceUp }}" hint-placeholder-val="{{ true }}"><dc-import name="Card" rank="{{ zRank }}" suit="{{ zSuit }}" scale="4.1" style="width:250px;height:350px" hint-size="250px,350px"></dc-import></sc-if>
+        </div>
+        <div style="max-width:520px;color:#F5EED8">
+          <div style="font-family:'Permanent Marker';font-size:56px;line-height:1;color:#fff">{{ zName }}</div>
+          <div style="display:inline-block;font-family:'Permanent Marker';font-size:18px;color:#fff;background:{{ zTypeColor }};padding:3px 14px;border-radius:4px;margin-top:12px">{{ zType }}</div>
+          <div style="font-family:'Gochi Hand';font-size:20px;color:#d8cba6;margin-top:9px">{{ zPos }}</div>
+          <div style="font-family:'Patrick Hand';font-size:26px;line-height:1.35;margin-top:16px">{{ zEffect }}</div>
+          <div style="font-family:'Gochi Hand';font-size:16px;color:#c9b98f;margin-top:20px">move away / release to close ✕</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ===== POLYMERIZATION BLACKJACK MODAL ===== -->
+    <sc-if value="{{ polyOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ closePoly }}" style="position:absolute;inset:0;background:rgba(30,22,10,.62);display:flex;align-items:center;justify-content:center;z-index:70">
+        <div onClick="{{ noop }}" style="background-color:#FBFAF4;background-image:repeating-linear-gradient(#FBFAF4 0 26px,#cfd9df 26px 27px);width:520px;padding:26px 34px 30px;border-radius:6px;box-shadow:0 16px 40px rgba(0,0,0,.55);transform:rotate(.5deg);border-left:3px solid #c65fa0;position:relative">
+          <div style="position:absolute;top:-14px;right:36px;width:130px;height:28px;background:rgba(232,222,170,.75);transform:rotate(4deg)"></div>
+          <div style="font-family:'Permanent Marker';font-size:28px;color:#c65fa0;margin-bottom:3px">POLYMERIZATION! ✦</div>
+          <div style="font-family:'Patrick Hand';font-size:16px;color:#5a5240;margin-bottom:14px">Fusing your <b>7♥</b> — draw from your own deck toward <b>21</b>. When you draw an Ace you pick 1 or 11. STAND = new power ⌈total÷2⌉; BUST = monster torn up.</div>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;min-height:96px;margin-bottom:12px;align-items:flex-start">
+            <sc-for list="{{ bjCards }}" as="card" hint-placeholder-count="2">
+              <div style="width:64px;height:90px"><dc-import name="Card" rank="{{ card.r }}" suit="{{ card.s }}" scale="1.05" style="width:64px;height:90px" hint-size="64px,90px"></dc-import></div>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+            <span style="font-family:'Patrick Hand';font-size:19px;color:#5a5240">TOTAL:</span>
+            <span style="font-family:'Permanent Marker';font-size:44px;color:{{ bjTotalColor }};line-height:1">{{ bjTotal }}</span>
+            <span style="font-family:'Permanent Marker';font-size:17px;color:#5a2a1e">{{ bjMsg }}</span>
+          </div>
+          <sc-if value="{{ pendingAce }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;background:#F4E04D;border:2px dashed #c65fa0;border-radius:5px;padding:9px 14px;transform:rotate(-.5deg)">
+              <span style="font-family:'Permanent Marker';font-size:17px;color:#8f3f74">ACE! count it as…</span>
+              <button onClick="{{ chooseAce1 }}" style="font-family:'Permanent Marker';font-size:18px;color:#fff;background:#2B4C9B;border:none;border-radius:3px;padding:7px 20px;cursor:pointer">1</button>
+              <button onClick="{{ chooseAce11 }}" style="font-family:'Permanent Marker';font-size:18px;color:#fff;background:#2B4C9B;border:none;border-radius:3px;padding:7px 20px;cursor:pointer">11</button>
+            </div>
+          </sc-if>
+          <div style="display:flex;gap:12px;align-items:center">
+            <button onClick="{{ hit }}" style="font-family:'Permanent Marker';font-size:21px;color:#fff;background:#2f6d4f;border:none;border-radius:5px;padding:12px 30px;cursor:pointer;box-shadow:0 3px 5px rgba(0,0,0,.3);transform:rotate(-1deg)">HIT</button>
+            <button onClick="{{ stand }}" style="font-family:'Permanent Marker';font-size:21px;color:#3a2f14;background:#F4E04D;border:none;border-radius:5px;padding:12px 30px;cursor:pointer;box-shadow:0 3px 5px rgba(0,0,0,.3);transform:rotate(1deg)">STAND</button>
+            <div style="flex:1"></div>
+            <button onClick="{{ resetBj }}" style="font-family:'Patrick Hand';font-size:15px;color:#7d7150;background:none;border:1.5px dashed #b7ad8c;border-radius:3px;padding:7px 14px;cursor:pointer">↺ redraw</button>
+            <button onClick="{{ closePoly }}" style="font-family:'Permanent Marker';font-size:15px;color:#fff;background:#C23B2E;border:none;border-radius:3px;padding:9px 16px;cursor:pointer">close ✕</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ===== CHEAT DRAWER ===== -->
+    <sc-if value="{{ cheatOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ closeCheat }}" style="position:absolute;inset:0;background:rgba(30,22,10,.55);display:flex;align-items:stretch;justify-content:flex-end;z-index:60">
+        <div onClick="{{ noop }}" style="width:520px;height:100%;overflow-y:auto;background-color:#F5EED8;background-image:repeating-linear-gradient(#F5EED8 0 30px,#cfd9df 30px 31px);padding:28px 40px 40px 56px;box-shadow:-10px 0 30px rgba(0,0,0,.4);border-left:3px solid #d98b8b;position:relative">
+          <div style="position:absolute;top:0;bottom:0;left:42px;width:2px;background:#d98b8b"></div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+            <div style="font-family:'Permanent Marker';font-size:28px;color:#C23B2E;transform:rotate(-1.5deg)">MY GAME — RULES!!!</div>
+            <button onClick="{{ closeCheat }}" style="font-family:'Permanent Marker';font-size:15px;color:#fff;background:#C23B2E;border:none;border-radius:3px;padding:6px 13px;cursor:pointer;transform:rotate(2deg)">✕</button>
+          </div>
+          <div style="font-family:'Patrick Hand';font-size:14px;color:#8B8578;margin-bottom:16px">✎ with rule-mods (scrawled after playtesting)</div>
+          <ol style="font-family:'Patrick Hand';font-size:18px;color:#1F1D1B;line-height:1.5;padding-left:22px;margin:0">
+            <li style="margin-bottom:11px">Deck is <b>52 cards + 2 JOKERS</b>. When somebody runs out the game <span style="font-family:'Permanent Marker';color:#C23B2E">ENDS</span> — best 5-card poker hand in your BANK wins!!</li>
+            <li style="margin-bottom:11px">Number cards = <b>MONSTERS</b>. Power = the number on the card.</li>
+            <li style="margin-bottom:11px">Face cards (J Q K) play for <b>rank</b> (number effect) OR <b>suit</b> (color effect) — you pick.</li>
+            <li style="margin-bottom:11px">Aces = <b>11 OR 1</b> — you pick when it helps.</li>
+            <li style="margin-bottom:11px"><b>ANY card</b> can be banked. Best 5-card poker hand is the win condition — keep it public!</li>
+            <li style="margin-bottom:11px">Play the stack top-down. Whoever has priority may <b>respond or pass</b>.</li>
+            <li style="margin-bottom:11px">POLY = point at <b>ONE</b> monster, then play <b>blackjack</b> with your deck. STAND = ⌈total÷2⌉. BUST = torn up.</li>
+            <li style="margin-bottom:2px">Traps go <b>face-down sideways</b>. <span style="font-family:'Permanent Marker';font-size:14px;color:#C23B2E">↳ NO TAKE-BACKS! (wall-punish deleted)</span></li>
+          </ol>
+          <div style="margin-top:22px;padding-top:14px;border-top:2px dashed #c3b997">
+            <div style="font-family:'Permanent Marker';font-size:15px;color:#2B4C9B;transform:rotate(-1deg);margin-bottom:8px">✦ RULE-MODS THIS RUN ✦</div>
+            <div style="font-family:'Patrick Hand';font-size:16px;color:#1F1D1B;background:rgba(251,250,244,.7);border:1.5px solid #d8cfb2;border-radius:4px;padding:8px 12px;transform:rotate(.4deg)"><b style="font-family:'Permanent Marker';color:#C23B2E">No Take-Backs</b> — whiteout — <i>wall-punish rule deleted</i></div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1600,&quot;height&quot;:900},&quot;showActionLog&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Interaction&quot;}}">
+class Component extends DCLogic {
+  state = { scale: 1, sel: null, zoom: null, poly: false, cheat: false, note: '',
+            bjCards: [{r:'7',s:'♣'},{r:'5',s:'♦'}], bjDone: false, pendingAce: false };
+  _hotkey = false; _hover = null;
+
+  cards = {
+    stackK:  { name:'K♠', rank:'K', suit:'♠', type:'Spell · on stack', typeColor:'#2B4C9B', color:'#2B4C9B', pos:'The Stack · resolves 1st', power:null, mode:'', effect:'Face card played for SUIT → NEGATE. Cancels the next effect below it on the stack (their J♥).', stickers:[], buffs:[], actions:[] },
+    stackJ:  { name:'J♥', rank:'J', suit:'♥', type:'Spell · on stack', typeColor:'#C23B2E', color:'#C23B2E', pos:'The Stack · waiting', power:null, mode:'', effect:"Face card played for RANK → DESTROY. Will be negated by K♠ above it unless Riley answers.", stickers:[], buffs:[], actions:[] },
+    you7h:   { name:'7♥', rank:'7', suit:'♥', type:'Monster', typeColor:'#C23B2E', color:'#C23B2E', pos:'Your field · M2 · Attack', power:7, mode:'Attack position', effect:'Number monster. Power equals the rank (7).', stickers:['RALLY — +1 to your other monsters'], buffs:[], actions:[{l:'✦ PLAY POLY on this',c:'#c65fa0',k:'poly'},{l:'DECLARE ATTACK',c:'#C23B2E',k:'atk'},{l:'BANK IT',c:'#2B4C9B',k:'bank'}] },
+    you10s:  { name:'10♠', rank:'10', suit:'♠', type:'Monster', typeColor:'#C23B2E', color:'#242b3a', pos:'Your field · M3 · Attack', power:10, mode:'Attack position', effect:'Number monster. Power equals the rank (10).', stickers:[], buffs:['RALLY from 7♥: power 10 → 11'], actions:[{l:'✦ PLAY POLY on this',c:'#c65fa0',k:'poly'},{l:'DECLARE ATTACK',c:'#C23B2E',k:'atk'},{l:'BANK IT',c:'#2B4C9B',k:'bank'}] },
+    youM4:   { name:'Set', faceDown:true, type:'Monster · SET', typeColor:'#C23B2E', color:'#5a2a1e', pos:'Your field · M4 · Defense', power:null, mode:'Face-down defense', effect:'A monster set face-down sideways in defense. Flip to reveal.', stickers:[], buffs:[], actions:[{l:'FLIP / REVEAL',c:'#C23B2E',k:'flip'}] },
+    youS1:   { name:'Set', faceDown:true, type:'Spell/Trap · SET', typeColor:'#7a4f9e', color:'#2f4257', pos:'Your field · S1 · face-down', power:null, mode:'Set', effect:'A spell or trap set face-down. Activate on your turn (spell) or in response (trap). Its tile turns purple once it is revealed as a trap.', stickers:[], buffs:[], actions:[{l:'FLIP / ACTIVATE',c:'#2f6d4f',k:'flip'}] },
+    rileyT2: { name:'Set', faceDown:true, type:'Spell/Trap · SET', typeColor:'#7a4f9e', color:'#2f4257', pos:"Riley's field · T2", power:null, mode:'Set (hidden)', effect:"Riley's face-down. Could be a spell or a trap — hidden type, so the tile stays neutral until it flips.", stickers:[], buffs:[], actions:[] },
+    rileyT3: { name:'Set', faceDown:true, type:'Spell/Trap · SET', typeColor:'#7a4f9e', color:'#2f4257', pos:"Riley's field · T3", power:null, mode:'Set (hidden)', effect:"Riley's face-down. Could be a spell or a trap — hidden type, so the tile stays neutral until it flips.", stickers:[], buffs:[], actions:[] },
+    rileyM3: { name:'Set', faceDown:true, type:'Monster · SET', typeColor:'#C23B2E', color:'#5a2a1e', pos:"Riley's field · M3 · Defense", power:null, mode:'Face-down defense', effect:"Riley's set monster in defense. Hidden until it flips or is attacked.", stickers:[], buffs:[], actions:[] },
+    rileyM4: { name:'6♣', rank:'6', suit:'♣', type:'Monster', typeColor:'#C23B2E', color:'#242b3a', pos:"Riley's field · M4 · Defense", power:6, mode:'Defense position', effect:"Number monster in defense. Power 6 — the shield badge marks its defense value.", stickers:[], buffs:[], actions:[] },
+    rileyTrap: { name:'4♣', rank:'4', suit:'♣', type:'Trap · revealed', typeColor:'#7a4f9e', color:'#242b3a', pos:"Riley's field · face-up trap", power:null, mode:'Revealed trap', effect:"Riley flipped this trap face-up last turn (T6). Once a trap is revealed its tile turns purple — this one has already sprung.", stickers:[], buffs:[], actions:[] },
+    hand9c:  { name:'9♣', rank:'9', suit:'♣', type:'Monster', typeColor:'#C23B2E', color:'#242b3a', pos:'Your hand', power:9, mode:'In hand', effect:'Number card. Summon as a monster (power 9), or bank it.', stickers:[], buffs:[], actions:[{l:'SUMMON',c:'#2f6d4f',k:'play'},{l:'BANK IT',c:'#2B4C9B',k:'bank'}] },
+    hand4d:  { name:'4♦', rank:'4', suit:'♦', type:'Monster', typeColor:'#C23B2E', color:'#c0392b', pos:'Your hand', power:4, mode:'In hand', effect:'Number card. Summon as a monster (power 4), or bank it.', stickers:[], buffs:[], actions:[{l:'SUMMON',c:'#2f6d4f',k:'play'},{l:'BANK IT',c:'#2B4C9B',k:'bank'}] },
+    handQh:  { name:'Q♥', rank:'Q', suit:'♥', type:'Face card', typeColor:'#8f3f74', color:'#c0392b', pos:'Your hand', power:null, mode:'In hand', effect:'Play for RANK (number effect) or SUIT (color effect) onto the stack — or bank it.', stickers:[], buffs:[], actions:[{l:'PLAY → RANK',c:'#C23B2E',k:'play'},{l:'PLAY → SUIT',c:'#2B4C9B',k:'play'},{l:'BANK IT',c:'#2B4C9B',k:'bank'}] },
+    hand2s:  { name:'2♠', rank:'2', suit:'♠', type:'Monster', typeColor:'#C23B2E', color:'#242b3a', pos:'Your hand', power:2, mode:'In hand', effect:'Number card. Summon as a monster (power 2), or bank it.', stickers:[], buffs:[], actions:[{l:'SUMMON',c:'#2f6d4f',k:'play'},{l:'BANK IT',c:'#2B4C9B',k:'bank'}] },
+    handAd:  { name:'A♦', rank:'A', suit:'♦', type:'Ace', typeColor:'#8f3f74', color:'#c0392b', pos:'Your hand', power:null, mode:'In hand', effect:'Ace = 11 or 1, your pick. Great for banking toward a strong hand or fusing at blackjack.', stickers:[], buffs:[], actions:[{l:'PLAY',c:'#2f6d4f',k:'play'},{l:'BANK IT',c:'#2B4C9B',k:'bank'}] },
+    youGrave: { name:'8♦', rank:'8', suit:'♦', type:'Graveyard · top', typeColor:'#5a4e35', color:'#c0392b', pos:'Your graveyard · 9 cards', power:null, mode:'Discarded', effect:'Top of your discard pile. Public — either player can target the graveyard.', stickers:[], buffs:[], actions:[] },
+    rileyGrave: { name:'J♦', rank:'J', suit:'♦', type:'Graveyard · top', typeColor:'#5a4e35', color:'#c0392b', pos:"Riley's graveyard · 12 cards", power:null, mode:'Discarded', effect:"Top of Riley's discard pile. Public — either player can target the graveyard.", stickers:[], buffs:[], actions:[] },
+    rileyBank: { name:"Riley's Bank", rank:'Q', suit:'♠', type:'Bank · public', typeColor:'#2B4C9B', color:'#C23B2E', pos:'Public bank · 4 cards', power:null, mode:'', effect:'Riley\u2019s banked cards (public): Q♠ Q♦ 7♣ 2♥. If the deck empties, the best 5-card poker hand wins.', stickers:[], buffs:['Best hand so far: Pair of Queens'], actions:[] },
+    youBank: { name:'Your Bank', rank:'A', suit:'♠', type:'Bank · public', typeColor:'#2B4C9B', color:'#2B4C9B', pos:'Public bank · 6 cards', power:null, mode:'', effect:'Your banked cards (public): A♠ K♦ 9♥ 9♠ 3♣ 6♦. Chasing two pair / trip 9s before the deck empties.', stickers:[], buffs:['Best hand so far: Pair of 9s'], actions:[] }
+  };
+
+  logEntries = [
+    { t:'T7', x:'You played K♠ for SUIT → NEGATE onto the stack.' },
+    { t:'T7', x:"Riley's J♥ (DESTROY) placed on the stack — now waiting." },
+    { t:'T7', x:'Battle Phase began. Riley can respond to the stack (or pass).' },
+    { t:'T6', x:'You banked 9♦ (bank → Pair of 9s).' },
+    { t:'T6', x:'Riley flipped 4♣ trap.' },
+    { t:'T6', x:'You summoned 10♠ in attack.' },
+    { t:'T5', x:'You fused a monster with Poly → power 11.' },
+    { t:'T5', x:'Riley summoned 6♣ in defense.' }
+  ];
+
+  bjPile = [{r:'A',s:'♥'},{r:'4',s:'♠'},{r:'2',s:'♦'},{r:'9',s:'♣'},{r:'6',s:'♠'},{r:'3',s:'♦'}];
+
+  keys = ['stackK','stackJ','you7h','you10s','youM4','youS1','rileyT2','rileyT3','rileyM3','rileyM4','rileyTrap','hand9c','hand4d','handQh','hand2s','handAd','youGrave','rileyGrave','rileyBank','youBank'];
+
+  componentDidMount() {
+    this.fit();
+    this._r = () => this.fit();
+    window.addEventListener('resize', this._r);
+    this._kd = (e) => {
+      if (e.key === 'z' || e.key === 'Z') {
+        this._hotkey = true;
+        if (this._hover) this.setState({ zoom: this._hover });
+      }
+    };
+    this._ku = (e) => {
+      if (e.key === 'z' || e.key === 'Z') { this._hotkey = false; this.setState({ zoom: null }); }
+    };
+    window.addEventListener('keydown', this._kd);
+    window.addEventListener('keyup', this._ku);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this._r);
+    window.removeEventListener('keydown', this._kd);
+    window.removeEventListener('keyup', this._ku);
+    clearTimeout(this._zt);
+  }
+  fit() { this.setState({ scale: Math.min(window.innerWidth / 1600, window.innerHeight / 900) }); }
+
+  hoverCard(k) {
+    this._hover = k;
+    if (this._hotkey) this.setState({ zoom: k });
+  }
+  leaveCard(k) {
+    if (this._hover === k) this._hover = null;
+    this.setState(s => ({ zoom: s.zoom === k ? null : s.zoom }));
+  }
+  pin(k) { this.setState(s => ({ sel: s.sel === k ? null : k, note: '' })); }
+  unpin() { this.setState({ sel: null, note: '' }); }
+  h(k) { return { enter: () => this.hoverCard(k), leave: () => this.leaveCard(k), click: () => { this._suppressUnpin = true; this.pin(k); } }; }
+
+  doAction(a) {
+    if (a.k === 'poly') { this.setState({ poly: true, note: '' }); return; }
+    const notes = {
+      atk: 'Attack declared — pick a target.',
+      bank: 'Banked! Bank hand recalculated.',
+      flip: 'Flipped face-up — effect activates.',
+      play: 'Played — added to the stack / board.'
+    };
+    this.setState({ note: notes[a.k] || 'Done.' });
+  }
+
+  bjValue(cards) {
+    let t = 0;
+    for (const c of cards) {
+      if (c.r === 'A') { t += (c.val || 0); }
+      else if (c.r === 'J' || c.r === 'Q' || c.r === 'K') { t += 10; }
+      else t += Number(c.r);
+    }
+    return t;
+  }
+  hit() {
+    const cards = this.state.bjCards;
+    if (this.state.bjDone || this.state.pendingAce || this.bjValue(cards) > 21) return;
+    const nx = this.bjPile[cards.length - 2];
+    if (!nx) return;
+    if (nx.r === 'A') { this.setState({ bjCards: cards.concat([{ r: 'A', s: nx.s, val: 0 }]), pendingAce: true }); return; }
+    const nc = cards.concat([nx]);
+    this.setState({ bjCards: nc, bjDone: this.bjValue(nc) > 21 });
+  }
+  chooseAce(v) {
+    const cards = this.state.bjCards.slice();
+    for (let i = cards.length - 1; i >= 0; i--) {
+      if (cards[i].r === 'A' && !cards[i].val) { cards[i] = Object.assign({}, cards[i], { val: v }); break; }
+    }
+    this.setState({ bjCards: cards, pendingAce: false, bjDone: this.bjValue(cards) > 21 });
+  }
+  stand() { if (this.state.pendingAce) return; this.setState({ bjDone: true }); }
+  resetBj() { this.setState({ bjCards: [{r:'7',s:'♣'},{r:'5',s:'♦'}], bjDone: false, pendingAce: false }); }
+
+  renderVals() {
+    const dk = this.state.sel;
+    const c = dk ? (this.cards[dk] || null) : null;
+    const hasSel = !!c;
+    const actions = ((c && c.actions) || []).map(a => ({ l:a.l, c:a.c, fn: () => { this._suppressUnpin = true; this.doAction(a); } }));
+    const hmap = {}, selFlags = {};
+    this.keys.forEach(k => { hmap[k] = this.h(k); selFlags[k] = this.state.sel === k; });
+    const z = this.state.zoom ? this.cards[this.state.zoom] : null;
+    const total = this.bjValue(this.state.bjCards);
+    const bust = total > 21;
+    const fused = Math.ceil(total / 2);
+    return {
+      boardScale: this.state.scale,
+      noop: (e) => { if (e && e.stopPropagation) e.stopPropagation(); },
+      h: hmap, selFlags,
+      showLog: this.props.showActionLog != null ? this.props.showActionLog : true,
+      logEntries: this.logEntries,
+      note: this.state.note,
+      bgClick: () => { if (this._suppressUnpin) { this._suppressUnpin = false; return; } this.unpin(); },
+      endTurn: () => { this._suppressUnpin = true; this.setState({ note: 'Turn passed to Riley.' }); },
+      openCheat: () => { this._suppressUnpin = true; this.setState({ cheat: true }); }, closeCheat: () => this.setState({ cheat: false }),
+      cheatOpen: this.state.cheat,
+      // zoom
+      zoomOpen: !!z,
+      zName: z ? z.name : '', zRank: (z && z.rank) ? z.rank : 'A', zSuit: (z && z.suit) ? z.suit : '♠',
+      zFaceDown: z ? !!z.faceDown : false, zFaceUp: z ? !z.faceDown : true,
+      zType: z ? z.type : '', zEffect: z ? z.effect : '', zTypeColor: z ? z.typeColor : '#000', zPos: z ? z.pos : '',
+      // detail
+      hasSel, noSel: !hasSel,
+      sName: c ? c.name : '', sRank: (c && c.rank) || 'A', sSuit: (c && c.suit) || '♠',
+      sFaceDown: c ? !!c.faceDown : false, sFaceUp: c ? !c.faceDown : true,
+      sType: c ? c.type : '', sTypeColor: c ? c.typeColor : '#000', sColor: c ? c.color : '#000', sPos: c ? c.pos : '',
+      sHasPower: c ? c.power != null : false, sPower: c ? c.power : null, sMode: c ? c.mode : '',
+      sEffect: c ? c.effect : '',
+      sHasStickers: c ? (c.stickers || []).length > 0 : false, sStickers: (c && c.stickers) || [],
+      sHasBuffs: c ? (c.buffs || []).length > 0 : false, sBuffs: (c && c.buffs && c.buffs[0]) || '',
+      sHasActions: actions.length > 0, sActions: actions,
+      // poly
+      polyOpen: this.state.poly,
+      closePoly: () => this.setState({ poly: false }),
+      bjCards: this.state.bjCards, bjTotal: total,
+      bjTotalColor: bust ? '#C23B2E' : (total === 21 ? '#2f6d4f' : '#3a2f14'),
+      bjMsg: bust ? 'BUST! monster torn up 💥' : (this.state.bjDone ? ('✓ FUSED → power ' + fused) : ''),
+      hit: () => this.hit(), stand: () => this.stand(), resetBj: () => this.resetBj(),
+      pendingAce: this.state.pendingAce,
+      chooseAce1: () => this.chooseAce(1), chooseAce11: () => this.chooseAce(11)
+    };
+  }
+}
+</script>
+</body>
+</html>
