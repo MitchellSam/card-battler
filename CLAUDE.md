@@ -1,8 +1,15 @@
 # CLAUDE.md — House Rules (card-battler)
 
-Docs: `UNIFIED_SPEC_v5.md` (canonical design) · `M*_IMPLEMENTATION_BRIEF.md` ·
-`DECK_SYSTEMS_PLAN.md` (future deck-systems/win-condition architecture) ·
-`RULES-GAPS.md` (generated — `npm run gen:rules-gaps`, never hand-edit).
+Docs (all in `planning/` unless noted): `PROJECT_SPEC_v6.md` (canonical
+product/architecture/run design) · `RULESET_v6.md` (complete current duel
+rules; the engine is authoritative for implemented behavior) · `STATUS.md`
+(state, gates, doc map — start here in a new session) · `EFFECT_CATALOG_v2.md`
+(effect content: implemented + M5 backlog) · `DECK_SYSTEMS_PLAN.md` (future
+deck-systems/win-condition architecture) · `MOBILE_DESIGN_HANDOFF.md` (UI
+redesign) · root `RULES-GAPS.md` (generated — `npm run gen:rules-gaps`, never
+hand-edit). Historical docs (spec v5, milestone briefs, sim findings, old
+handoffs) were consolidated into the above on 2026-07-23 and deleted — they
+live in git history.
 
 **Prime directive:** never invent rules or content. Where the spec/briefs are
 silent, tag `// RULES-GAP:`, implement the conservative reading, and leave the

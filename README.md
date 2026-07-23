@@ -1,19 +1,16 @@
 # House Rules (working title)
 
 Card battler played with two standard 54-card decks — kids inventing and
-house-ruling their own card game. Design docs:
+house-ruling their own card game. Docs (consolidated 2026-07-23; the milestone
+briefs, spec v5, sim findings, and old handoffs they replaced live in git
+history):
 
-- [UNIFIED_SPEC_v5.md](UNIFIED_SPEC_v5.md) — resolved design tree (canonical)
-- [M1_IMPLEMENTATION_BRIEF.md](M1_IMPLEMENTATION_BRIEF.md) — complete base ruleset for the engine
-- [M2_IMPLEMENTATION_BRIEF.md](M2_IMPLEMENTATION_BRIEF.md) — sim harness + heuristic agents
-- [M2.5_IMPLEMENTATION_BRIEF.md](M2.5_IMPLEMENTATION_BRIEF.md) — ratified rules changes + re-simulation
-- [M2-FINDINGS.md](M2-FINDINGS.md) — pacing verdicts + designer decisions (M2 data + M2.5 addendum)
-- [M3_IMPLEMENTATION_BRIEF.md](M3_IMPLEMENTATION_BRIEF.md) — browser prototype (playable vs greedy AI)
-- [EFFECT_CATALOG_v1.md](EFFECT_CATALOG_v1.md) — first-pass sticker/effect catalog (commons/uncommons/rares)
-- [M4_DESIGN_RECOMMENDATIONS.md](M4_DESIGN_RECOMMENDATIONS.md) — Run-layer content + structure recommendations (ratified 2026-07-19 as the working set)
-- [M4_IMPLEMENTATION_BRIEF.md](M4_IMPLEMENTATION_BRIEF.md) — Run mode layer: effect framework, per-player config, node map, economy, persistence
-- [HANDOFF_M4.md](HANDOFF_M4.md) — implementation handoff for the M4 milestone (what shipped, what's next, gotchas)
-- [DECK_SYSTEMS_PLAN.md](DECK_SYSTEMS_PLAN.md) — architecture plan + decision record for future deck systems (tarot, mahjong, …) and pluggable win conditions; Phase 1 seam hardening is behavior-preserving, decks deferred
+- [planning/PROJECT_SPEC_v6.md](planning/PROJECT_SPEC_v6.md) — product, architecture & run-mode design (canonical)
+- [planning/RULESET_v6.md](planning/RULESET_v6.md) — the complete current duel rules (engine is authoritative for implemented behavior)
+- [planning/STATUS.md](planning/STATUS.md) — current state, gates, open decisions, document map (start here)
+- [planning/EFFECT_CATALOG_v2.md](planning/EFFECT_CATALOG_v2.md) — sticker/effect content: implemented registry mirror + M5 backlog
+- [planning/DECK_SYSTEMS_PLAN.md](planning/DECK_SYSTEMS_PLAN.md) — architecture plan + decision record for future deck systems (tarot, mahjong, …) and pluggable win conditions; Phase 1 seam hardening is behavior-preserving, decks deferred
+- [planning/MOBILE_DESIGN_HANDOFF.md](planning/MOBILE_DESIGN_HANDOFF.md) — UI redesign: mobile-first duel screens + desktop convergence (mockups in [mockups/](mockups/))
 - [RULES-GAPS.md](RULES-GAPS.md) — generated list of open rules questions found during implementation (decide with the designers)
 
 ## Layout
@@ -86,7 +83,8 @@ npm run gen:rules-gaps
   so M4 slots in without a refactor.
 - **M2 (sim harness + heuristic AI v0): complete.** Agents in `packages/sim`,
   ≥100 games/sec floor met (hand-written state clone replaced `structuredClone`).
-  Findings and the designer-decision agenda live in [M2-FINDINGS.md](M2-FINDINGS.md).
+  Findings live in the `results/*/REPORT.md` files (the narrative
+  M2-FINDINGS.md doc was consolidated away; see git history).
 - **M2.5 (ratified rules changes): complete.** Designer-ratified rules landed:
   draw-2 baseline, game end only at a draw phase, no first-turn Battle Phase,
   Ace as 1-or-11 spell fuel, Poly total starts at the target's card value with
@@ -113,7 +111,7 @@ npm run gen:rules-gaps
   hit lands full attacker power, a combat kill scales by winner-minus-loser); the
   `bankTriggerScaling` knob also offers `power` (winner's own power) and `off`
   (flat 1). Simulated across 120k games before ratification — see `results/R6`
-  and the R6 section of M2-FINDINGS.md.
+  (`results/R6/REPORT.md`).
 - **M3 (browser prototype): implemented, awaiting the human gate.** `npm run
   web` serves a full duel vs greedy from a shown seed. Every action type and
   pending decision from the brief's inventory is operable (mulligan multi-
@@ -176,3 +174,10 @@ npm run gen:rules-gaps
   - **Remaining exit gate: a human completes a full run start-to-finish in the
     browser** (the headless equivalent is green in
     `packages/run/test/fullrun.test.ts`).
+- **UI redesign (2026-07-23): mobile-first duel screens.** The Duel Screen
+  mockup was rebuilt for a landscape phone (true 844×390 logical canvas, 44px
+  touch floors, escalated live stack, long-press zoom) and the desktop screen
+  converged onto the same zoning grammar (`mockups/DuelScreen-Mobile.dc.html`,
+  `mockups/DuelScreen-v2.dc.html`, shared `Card`/`CardTile` components).
+  Spec, ratified interactions, and remaining screens:
+  [planning/MOBILE_DESIGN_HANDOFF.md](planning/MOBILE_DESIGN_HANDOFF.md).

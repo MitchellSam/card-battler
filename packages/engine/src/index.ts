@@ -1,6 +1,6 @@
 // @house-rules/engine — headless, pure, dependency-free rules engine (M1).
 //
-// Engine contract (non-negotiable, see M1_IMPLEMENTATION_BRIEF.md):
+// Engine contract (non-negotiable, see planning/RULESET_v6.md + planning/PROJECT_SPEC_v6.md):
 //   applyAction(state, action, rng) => { state, events }   // pure
 //   legalActions(state, player) => Action[]
 //   viewFor(state, player) => PlayerView                    // redacted

@@ -91,7 +91,7 @@ const dflt = (
 });
 
 /**
- * Every implemented effect. Catalog stickers first (EFFECT_CATALOG_v1.md,
+ * Every implemented effect. Catalog stickers first (planning/EFFECT_CATALOG_v2.md,
  * text verbatim minus designer commentary), then the base-game defaults
  * (provisional tiers: number flips common, J/Q/K + suit spells uncommon).
  */
