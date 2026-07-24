@@ -35,6 +35,43 @@ Rework the "Kid's Card Duel" UI suite (6 screens, desk-paper aesthetic) around o
   - `Card.dc.html` — gained a **`scale` prop**; all internal font sizes/offsets computed in renderVals. Every call site passes it.
   - `CardTile.dc.html` — NEW: the condensed board tile. Props: rank/suit, `category` (monster `#d68b73` / spell `#8fa9c9` / **trap `#b79ccb`** / neutral), face-down, `pos` label, power `badge`, `mark`, `selected` (scribble ring). Used by both duel screens.
 
+## General card-game-UI principles (GDKeys — apply to EVERY screen)
+
+The whole redesign is grounded in the GDKeys article "The Card Games UI Design
+of Fairtravel Battle" (https://gdkeys.com/the-card-games-ui-design-of-fairtravel-battle/).
+The duel screens implemented its **board-specific** lessons (hero corners,
+60/40 split, condensed tiles, timeline seam — see Key Decisions). These are the
+article's **general** lessons; they are the design bar for every screen,
+including the non-board ones (map, shop, cheat sheet, summary, anatomy), which
+do not inherit the board-specific rules:
+
+- **Diegetic integration** — anchor UI in the game world; don't float generic
+  panels over it. Each screen IS its object (treasure map, corner store, taped
+  rules sheet, scorekeeping page); chrome reads as drawn/taped/stuck onto that
+  object. This is the article's strongest transferable lesson and the reason
+  the handmade aesthetic is load-bearing, not decoration.
+- **Gestalt zoning via negative space** — define regions by grouping and
+  whitespace, not boxes-everywhere or text labels; structure should be legible
+  before a word is read.
+- **Value prominence** — the one thing that matters on a screen pops (a pack
+  price, the winning poker hand, the coin count, the boss node); secondary
+  stats recede. Never render everything at one weight.
+- **Eliminate redundant info** — never show the same fact twice (the duel
+  deck-stat dedupe is the pattern). Audit each screen.
+- **Minimize eye travel / action-location alignment** — put the control where
+  the thing happens (RIP OPEN on the pack, travel-confirm on the tapped node)
+  and group related controls so eye/thumb don't hunt.
+- **Fantasy is functional** — spend space on theme deliberately; condense
+  mechanics, not the handmade aesthetic.
+- **Incremental / quick-wins mindset** — tighten, relocate, condense an
+  existing layout rather than redesign from scratch where the layout already
+  works (NodeMap, CheatSheet).
+
+**Deliberate divergence from the article:** it recommends card detail on HOVER
+with a minimal board. We reversed that for touch — the ratified model is
+click/tap-to-pin with no hover preview (see Key Decisions). Where the article
+says "hover," our ratified interaction wins.
+
 ## Key Decisions
 
 | Decision | Why |
